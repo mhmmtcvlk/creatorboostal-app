@@ -59,14 +59,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         )
     return user
 
-# Optional auth dependency
-async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[User]:
-    if not credentials:
-        return None
-    try:
-        return await get_current_user(credentials)
-    except HTTPException:
-        return None
+# Admin dependency
+async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
 
 # Startup and shutdown events
 @app.on_event("startup")
