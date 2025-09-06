@@ -48,31 +48,8 @@ export default function AdminPanel() {
 
   const loadStats = async () => {
     try {
-      // Use apiClient instead of direct fetch
-      const response = await fetch('/api/admin/stats', {
-        headers: {
-          'Authorization': `Bearer ${await getAuthToken()}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      } else {
-        console.error('Failed to load stats:', response.status);
-        // Mock data for now
-        setStats({
-          total_users: 25,
-          vip_users: 8,
-          total_boosts: 156,
-          active_boosts: 43,
-          total_topics: 24,
-          total_social_accounts: 89,
-          total_vip_purchases: 12,
-          revenue: 599.88
-        });
-      }
+      const data = await apiClient.getAdminStats();
+      setStats(data);
     } catch (error) {
       console.error('Error loading admin stats:', error);
       // Show mock data if API fails
