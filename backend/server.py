@@ -344,11 +344,11 @@ async def get_me(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         username=current_user.username,
         email=current_user.email,
-        role=current_user.role,
-        vip_package=current_user.vip_package,
+        role=current_user.role.value,  # Convert enum to string
+        vip_package=current_user.vip_package.value if current_user.vip_package else None,  # Convert enum to string
         vip_expires_at=current_user.vip_expires_at,
         credits=current_user.credits,
-        language=current_user.language,
+        language=current_user.language.value,  # Convert enum to string
         is_following_creator=current_user.is_following_creator,
         created_at=current_user.created_at
     )
