@@ -84,7 +84,7 @@ export default function Login() {
             >
               <MaterialIcons name="trending-up" size={48} color="white" />
             </LinearGradient>
-            <Text style={styles.logoText}>CreatorBoosta</Text>
+            <Text style={styles.logoText}>CreatorBoostal</Text>
             <Text style={styles.logoSubtext}>Hesabınıza giriş yapın</Text>
           </View>
 
