@@ -330,7 +330,6 @@ export default function CreateBoost() {
               style={styles.createButton}
             />
           </View>
-        )}
 
         {/* Account Form Modal */}
         {showAccountForm && (
