@@ -311,15 +311,18 @@ backend:
 
   - task: "VIP Package Update API"
     implemented: true
-    working: false
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: false
           agent: "main"
           comment: "Updated VIP package update endpoint to use VipPackageUpdate model. Fixed hardcoded API URLs in frontend and updated to use apiClient. Need to test if Save and Purchase buttons work properly."
+        - working: true
+          agent: "testing"
+          comment: "VIP Package Update API (PUT /api/admin/vip/packages/{package_id}) working correctly. Successfully tested: price updates (39.99), status updates (active/inactive), combined updates (price + status), error handling for invalid package IDs (404), and admin authentication requirements (403 without auth). All 6 VIP package update test scenarios passed (100% success rate). The Save/Purchase buttons in VIP admin panel should now work properly."
 
 frontend:
   - task: "Frontend Testing"
