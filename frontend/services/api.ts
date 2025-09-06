@@ -155,6 +155,39 @@ class ApiClient {
   }
 
   // Forum endpoints
+  async getForumTopics(categoryId?: string, skip = 0, limit = 20): Promise<any[]> {
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString(),
+      ...(categoryId && { category_id: categoryId })
+    });
+    const response = await this.client.get(`/forum/topics?${params}`);
+    return response.data;
+  }
+
+  async getForumCategories(): Promise<any[]> {
+    const response = await this.client.get('/forum/categories');
+    return response.data;
+  }
+
+  // Analytics endpoint
+  async getAdminAnalytics(period = '30d'): Promise<any> {
+    const response = await this.client.get(`/admin/analytics?period=${period}`);
+    return response.data;
+  }
+
+  // Credits endpoints
+  async watchAd(): Promise<{ credits_earned: number }> {
+    const response = await this.client.post('/credits/watch-ad');
+    return response.data;
+  }
+
+  async followCreator(): Promise<{ credits_earned: number }> {
+    const response = await this.client.post('/credits/follow-creator');
+    return response.data;
+  }
+
+  // Forum endpoints
   async getForumCategories(): Promise<ForumCategory[]> {
     const response = await this.client.get<ForumCategory[]>('/forum/categories');
     return response.data;
