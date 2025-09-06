@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Create the main app
-app = FastAPI(title="CreatorBoosta API", version="1.0.0")
+app = FastAPI(title="CreatorBoostal API", version="1.0.0")
 
 # Security
 security = HTTPBearer()
