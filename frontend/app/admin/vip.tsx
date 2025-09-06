@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors } from '../../constants/theme';
 import { GradientButton } from '../../components/GradientButton';
+import { apiClient } from '../../services/api';
 
 interface VipUser {
   id: string;
