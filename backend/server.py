@@ -225,8 +225,8 @@ async def register(user_data: UserCreate):
         type=NotificationType.CREDITS_EARNED,
         title="Hoş Geldiniz!",
         title_en="Welcome!",
-        message="CreatorBoosta'ya hoş geldiniz! 10 bonus kredi kazandınız.",
-        message_en="Welcome to CreatorBoosta! You earned 10 bonus credits."
+        message="CreatorBoostal'a hoş geldiniz! 10 bonus kredi kazandınız.",
+        message_en="Welcome to CreatorBoostal! You earned 10 bonus credits."
     )
     await database.create_notification(welcome_notification)
     
