@@ -13,7 +13,7 @@ class ApiClient {
   constructor() {
     const baseURL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://creatorboost-3.preview.emergentagent.com';
+                   'https://creatorboostal.preview.emergentagent.com';
 
     this.client = axios.create({
       baseURL: `${baseURL}/api`,
