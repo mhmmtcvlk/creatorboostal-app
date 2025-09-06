@@ -139,12 +139,9 @@ export default function AdminVip() {
   const loadVipData = async () => {
     setLoading(true);
     try {
-      // Load VIP packages
-      const packagesResponse = await fetch('/api/vip/packages');
-      if (packagesResponse.ok) {
-        const packages = await packagesResponse.json();
-        setVipPackages(packages);
-      }
+      // Use apiClient for proper backend integration
+      const packages = await apiClient.getVipPackages();
+      setVipPackages(packages);
 
       // Mock VIP users data (in real app, this would be from API)
       const mockVipUsers: VipUser[] = [
@@ -176,6 +173,7 @@ export default function AdminVip() {
       setVipUsers(mockVipUsers);
     } catch (error) {
       console.error('Error loading VIP data:', error);
+      Alert.alert('Hata', 'VIP verileri yüklenemedi');
     } finally {
       setLoading(false);
     }
