@@ -7,7 +7,6 @@ import {
   Pressable,
   Alert,
   RefreshControl,
-  TextInput,
   Modal,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -32,23 +31,23 @@ interface PaymentRecord {
 }
 
 interface PaymentStats {
-  total_revenue: number;
   pending_payments: number;
   approved_today: number;
   mobile_payments: number;
   bank_transfers: number;
   crypto_payments: number;
+  total_revenue: number; // This will be calculated from actual approved payments
 }
 
 export default function PaymentManagement() {
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
   const [stats, setStats] = useState<PaymentStats>({
-    total_revenue: 0,
     pending_payments: 0,
     approved_today: 0,
     mobile_payments: 0,
     bank_transfers: 0,
     crypto_payments: 0,
+    total_revenue: 0,
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,58 +61,40 @@ export default function PaymentManagement() {
 
   const loadPaymentData = async () => {
     try {
-      // Mock data for now - in real app would call API
-      const mockPayments: PaymentRecord[] = [
-        {
-          id: '1',
-          user_id: 'user1',
-          username: 'ahmet123',
-          package_name: 'VIP Pro',
-          amount: 49.99,
-          payment_method: 'mobile_payment',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          notes: 'Turkcell Paycell ile ödeme yapıldı'
-        },
-        {
-          id: '2',
-          user_id: 'user2', 
-          username: 'fatma456',
-          package_name: 'VIP Starter',
-          amount: 19.99,
-          payment_method: 'bank_transfer',
-          status: 'pending',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          notes: 'Ziraat Bankası havale dekontu gönderildi'
-        },
-        {
-          id: '3',
-          user_id: 'user3',
-          username: 'mehmet789',
-          package_name: 'VIP Premium',
-          amount: 99.99,
-          payment_method: 'crypto',
-          status: 'approved',
-          created_at: new Date(Date.now() - 7200000).toISOString(),
-          notes: 'Bitcoin transfer onaylandı'
-        }
-      ];
-
-      setPaymentRecords(mockPayments);
+      // Load real payment data from API
+      const response = await apiClient.getPaymentRecords();
+      setPaymentRecords(response.payments || []);
       
-      const mockStats: PaymentStats = {
-        total_revenue: 15680.50,
-        pending_payments: mockPayments.filter(p => p.status === 'pending').length,
-        approved_today: 5,
-        mobile_payments: mockPayments.filter(p => p.payment_method === 'mobile_payment').length,
-        bank_transfers: mockPayments.filter(p => p.payment_method === 'bank_transfer').length,
-        crypto_payments: mockPayments.filter(p => p.payment_method === 'crypto').length,
+      // Calculate real stats from actual data
+      const payments = response.payments || [];
+      const approvedPayments = payments.filter(p => p.status === 'approved');
+      const today = new Date().toDateString();
+      const todayApproved = approvedPayments.filter(p => 
+        new Date(p.created_at).toDateString() === today
+      );
+      
+      const realStats: PaymentStats = {
+        pending_payments: payments.filter(p => p.status === 'pending').length,
+        approved_today: todayApproved.length,
+        mobile_payments: payments.filter(p => p.payment_method === 'mobile_payment').length,
+        bank_transfers: payments.filter(p => p.payment_method === 'bank_transfer').length,
+        crypto_payments: payments.filter(p => p.payment_method === 'crypto').length,
+        total_revenue: approvedPayments.reduce((sum, p) => sum + p.amount, 0),
       };
       
-      setStats(mockStats);
+      setStats(realStats);
     } catch (error) {
       console.error('Error loading payment data:', error);
-      Alert.alert('Hata', 'Ödeme verileri yüklenemedi');
+      // Empty state - no mock data
+      setPaymentRecords([]);
+      setStats({
+        pending_payments: 0,
+        approved_today: 0,
+        mobile_payments: 0,
+        bank_transfers: 0,
+        crypto_payments: 0,
+        total_revenue: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -143,23 +124,14 @@ export default function PaymentManagement() {
   const processPayment = async (paymentId: string, action: 'approve' | 'reject') => {
     setProcessingPayment(true);
     try {
-      // In real app, would call API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await apiClient.processPayment(paymentId, action);
       
-      setPaymentRecords(prev => 
-        prev.map(payment => 
-          payment.id === paymentId 
-            ? { ...payment, status: action === 'approve' ? 'approved' : 'rejected' }
-            : payment
-        )
-      );
-
       Alert.alert(
         'Başarılı!',
         `Ödeme ${action === 'approve' ? 'onaylandı' : 'reddedildi'}. Kullanıcı bilgilendirildi.`
       );
       
-      await loadPaymentData(); // Refresh stats
+      await loadPaymentData(); // Refresh data
     } catch (error) {
       Alert.alert('Hata', 'İşlem gerçekleştirilemedi');
     } finally {
@@ -170,6 +142,31 @@ export default function PaymentManagement() {
   const showPaymentDetails = (payment: PaymentRecord) => {
     setSelectedPayment(payment);
     setShowDetailsModal(true);
+  };
+
+  const resetAllData = () => {
+    Alert.alert(
+      '⚠️ SİSTEM SIFIRLAMA',
+      'Bu işlem tüm kullanıcıları, VIP durumlarını, boost geçmişini ve ödeme kayıtlarını silecek (Admin hesabı hariç).\n\nBu işlem GERİ ALINMAZ!',
+      [
+        { text: 'İptal', style: 'cancel' },
+        { 
+          text: 'SİSTEMİ SIFIRLA', 
+          style: 'destructive',
+          onPress: performSystemReset
+        }
+      ]
+    );
+  };
+
+  const performSystemReset = async () => {
+    try {
+      await apiClient.resetSystem();
+      Alert.alert('Başarılı!', 'Sistem sıfırlandı. Sadece admin hesabı korundu.');
+      await loadPaymentData();
+    } catch (error) {
+      Alert.alert('Hata', 'Sistem sıfırlanamadı');
+    }
   };
 
   const getPaymentMethodIcon = (method: string) => {
@@ -242,20 +239,22 @@ export default function PaymentManagement() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        {/* Revenue Overview */}
-        <LinearGradient
-          colors={['#00B894', '#55EFC4']}
-          style={styles.revenueCard}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.revenueHeader}>
-            <MaterialIcons name="account-balance-wallet" size={32} color="white" />
-            <Text style={styles.revenueTitle}>Toplam Gelir</Text>
-          </View>
-          <Text style={styles.revenueAmount}>{formatCurrency(stats.total_revenue)}</Text>
-          <Text style={styles.revenueSubtitle}>Bu ay kazancınız ₺{(stats.total_revenue * 0.2).toFixed(2)}</Text>
-        </LinearGradient>
+        {/* Revenue Overview - Only show if there's actual revenue */}
+        {stats.total_revenue > 0 && (
+          <LinearGradient
+            colors={['#00B894', '#55EFC4']}
+            style={styles.revenueCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.revenueHeader}>
+              <MaterialIcons name="account-balance-wallet" size={32} color="white" />
+              <Text style={styles.revenueTitle}>Toplam Gelir</Text>
+            </View>
+            <Text style={styles.revenueAmount}>{formatCurrency(stats.total_revenue)}</Text>
+            <Text style={styles.revenueSubtitle}>Onaylanan ödemelerden</Text>
+          </LinearGradient>
+        )}
 
         {/* Quick Stats */}
         <View style={styles.section}>
@@ -300,10 +299,10 @@ export default function PaymentManagement() {
             />
             
             <GradientButton
-              title="Banka Bilgileri"
-              onPress={() => Alert.alert('Bilgi', 'Banka bilgileri ayarları yakında aktif olacak')}
+              title="Sistemi Sıfırla"
+              onPress={resetAllData}
               size="medium"
-              gradient={[colors.accent, colors.primary]}
+              gradient={[colors.error, '#FF7675']}
               style={styles.quickActionButton}
             />
           </View>
@@ -311,7 +310,7 @@ export default function PaymentManagement() {
 
         {/* Payment Records */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🧾 Son Ödeme İstekleri</Text>
+          <Text style={styles.sectionTitle}>🧾 Ödeme İstekleri</Text>
           
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -319,7 +318,7 @@ export default function PaymentManagement() {
             </View>
           ) : paymentRecords.length > 0 ? (
             <View style={styles.paymentsList}>
-              {paymentRecords.slice(0, 10).map((payment) => (
+              {paymentRecords.map((payment) => (
                 <Pressable
                   key={payment.id}
                   style={styles.paymentCard}
@@ -395,8 +394,17 @@ export default function PaymentManagement() {
           ) : (
             <View style={styles.emptyContainer}>
               <MaterialIcons name="receipt" size={48} color={colors.textSecondary} />
-              <Text style={styles.emptyTitle}>Henüz ödeme yok</Text>
-              <Text style={styles.emptySubtitle}>Ödeme istekleri burada görünecek</Text>
+              <Text style={styles.emptyTitle}>Henüz ödeme isteği yok</Text>
+              <Text style={styles.emptySubtitle}>
+                Kullanıcılar VIP paket satın aldığında burada görünecek
+              </Text>
+              <GradientButton
+                title="Test Ödemesi Oluştur"
+                onPress={() => Alert.alert('Test', 'Gerçek kullanıcılar VIP satın aldığında otomatik görünecek')}
+                size="medium"
+                gradient={[colors.accent, colors.primary]}
+                style={styles.testButton}
+              />
             </View>
           )}
         </View>
@@ -693,6 +701,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  testButton: {
+    width: 200,
   },
   modalOverlay: {
     flex: 1,

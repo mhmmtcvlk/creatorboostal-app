@@ -1,409 +1,559 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from pathlib import Path
-import os
-import logging
+from pydantic import ValidationError
 from datetime import datetime, timedelta
-from typing import Optional, List
+import logging
+import jwt
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 # Import our modules
 from models import *
-from auth import create_access_token, verify_token, get_password_hash
+from auth import get_password_hash, verify_password, create_access_token, decode_token
 from database import database
 
+# Load environment variables
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create the main app
+# Initialize FastAPI app
 app = FastAPI(title="CreatorBoostal API", version="1.0.0")
 
-# Security
-security = HTTPBearer()
+# Initialize API router
+api_router = APIRouter(prefix="/api")
 
-# CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Create API router
-api_router = APIRouter(prefix="/api")
+# Security
+security = HTTPBearer()
 
 # Dependency to get current user
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
-    username = verify_token(credentials.credentials)
-    if not username:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user = await database.get_user_by_username(username)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    return user
-
-# Admin dependency
-async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-    return current_user
-
-# Startup and shutdown events
-@app.on_event("startup")
-async def startup_db_client():
-    await database.connect_to_mongo()
-    # Initialize default data
-    await initialize_default_data()
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    await database.close_mongo_connection()
-
-async def initialize_default_data():
-    """Initialize default forum categories, VIP packages, and admin user"""
     try:
-        # Check if admin user exists
-        admin_email = "mhmmdc83@gmail.com"
-        admin_user = await database.db.users.find_one({"email": admin_email})
+        payload = decode_token(credentials.credentials)
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
         
-        if not admin_user:
-            # Create admin user
-            admin_user_data = User(
-                username="admin",
-                email=admin_email,
-                password_hash=get_password_hash("admin123"),  # Default admin password
-                security_question="İlk evcil hayvanınızın adı neydi?",
-                security_answer_hash=get_password_hash("admin"),
-                role=UserRole.ADMIN,
-                credits=99999,  # Unlimited credits for admin
-                language=Language.TR
-            )
-            await database.db.users.insert_one(admin_user_data.dict())
-            logger.info(f"Admin user created: {admin_email}")
-        else:
-            # Update existing user to admin
-            await database.db.users.update_one(
-                {"email": admin_email},
-                {"$set": {"role": UserRole.ADMIN, "credits": 99999}}
-            )
-            logger.info(f"User updated to admin: {admin_email}")
+        user_data = await database.db.users.find_one({"id": user_id})
+        if user_data is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return User(**user_data)
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-        # Check if forum categories exist
-        categories = await database.get_forum_categories()
-        if not categories:
-            default_categories = [
-                ForumCategory(
-                    name="Instagram Pazarlama",
-                    name_en="Instagram Marketing", 
-                    description="Instagram büyüme stratejileri ve ipuçları",
-                    description_en="Instagram growth strategies and tips",
-                    icon="instagram"
-                ),
-                ForumCategory(
-                    name="TikTok Büyüme",
-                    name_en="TikTok Growth",
-                    description="TikTok viral olma teknikleri",
-                    description_en="TikTok viral techniques",
-                    icon="tiktok"
-                ),
-                ForumCategory(
-                    name="YouTube Creator",
-                    name_en="YouTube Creator",
-                    description="YouTube kanal büyütme rehberi",
-                    description_en="YouTube channel growth guide",
-                    icon="youtube"
-                ),
-                ForumCategory(
-                    name="Genel Sosyal Medya",
-                    name_en="General Social Media",
-                    description="Tüm platformlar için genel ipuçları",
-                    description_en="General tips for all platforms",
-                    icon="share"
-                )
-            ]
-            
-            for category in default_categories:
-                await database.db.forum_categories.insert_one(category.dict())
-        
-        # Check if VIP packages exist
-        packages = await database.get_vip_packages()
-        if not packages:
-            default_packages = [
-                VipPackageInfo(
-                    name="Starter VIP",
-                    name_en="Starter VIP",
-                    price=29.99,
-                    duration_days=30,
-                    features=[
-                        "AI destekli içerik önerileri",
-                        "Boost'ta %20 öncelik",
-                        "Günlük 20 bonus kredi",
-                        "Özel VIP rozeti",
-                        "Mesajlaşma özelliği",
-                        "Öncelikli müşteri desteği"
-                    ],
-                    features_en=[
-                        "AI-powered content suggestions",
-                        "20% boost priority",
-                        "20 daily bonus credits",
-                        "Exclusive VIP badge",
-                        "Messaging feature",
-                        "Priority customer support"
-                    ]
-                ),
-                VipPackageInfo(
-                    name="Pro VIP",
-                    name_en="Pro VIP",
-                    price=49.99,
-                    duration_days=30,
-                    features=[
-                        "Gelişmiş AI analitikleri",
-                        "Boost'ta %50 öncelik",
-                        "Günlük 50 bonus kredi",
-                        "Altın VIP rozeti",
-                        "Öncelikli destek",
-                        "Özel kategori erişimi",
-                        "Detaylı hesap analitikleri",
-                        "Otomatik boost özelliği"
-                    ],
-                    features_en=[
-                        "Advanced AI analytics",
-                        "50% boost priority", 
-                        "50 daily bonus credits",
-                        "Gold VIP badge",
-                        "Priority support",
-                        "Exclusive category access",
-                        "Detailed account analytics",
-                        "Auto-boost feature"
-                    ]
-                ),
-                VipPackageInfo(
-                    name="Premium VIP",
-                    name_en="Premium VIP",
-                    price=99.99,
-                    duration_days=30,
-                    features=[
-                        "Tam AI destekli otomatik içerik",
-                        "Boost'ta %100 öncelik",
-                        "Günlük 100 bonus kredi",
-                        "Elmas VIP rozeti",
-                        "Kişisel hesap yöneticisi",
-                        "Özel etkinlik erişimi",
-                        "Gelişmiş hesap analitikleri",
-                        "Sınırsız otomatik boost",
-                        "Özel telegram desteği"
-                    ],
-                    features_en=[
-                        "Full AI-powered auto content",
-                        "100% boost priority",
-                        "100 daily bonus credits", 
-                        "Diamond VIP badge",
-                        "Personal account manager",
-                        "Exclusive event access",
-                        "Advanced account analytics",
-                        "Unlimited auto-boost",
-                        "Private telegram support"
-                    ]
-                )
-            ]
-            
-            for package in default_packages:
-                await database.db.vip_packages.insert_one(package.dict())
-        
-        # Initialize admin settings
-        admin_settings = [
-            {"key": "telegram_bot_token", "value": "", "description": "Telegram Bot API Token"},
-            {"key": "telegram_chat_id", "value": "", "description": "Telegram Chat ID for notifications"},
-            {"key": "instagram_api_token", "value": "", "description": "Instagram Basic Display API Token"},
-            {"key": "admob_app_id", "value": "", "description": "AdMob App ID"},
-            {"key": "admob_ad_unit_id", "value": "", "description": "AdMob Ad Unit ID"},
-            {"key": "creator_instagram", "value": "mhmmtcvlk", "description": "Creator Instagram username"},
-            {"key": "company_name", "value": "CreatorBoostal", "description": "Company name"},
-            {"key": "company_email", "value": "info@creatorboostal.com", "description": "Company email"},
-            {"key": "support_email", "value": "support@creatorboostal.com", "description": "Support email"},
-        ]
-        
-        for setting in admin_settings:
-            existing = await database.db.admin_settings.find_one({"key": setting["key"]})
-            if not existing:
-                admin_setting = AdminSettings(
-                    key=setting["key"],
-                    value=setting["value"],
-                    description=setting["description"]
-                )
-                await database.db.admin_settings.insert_one(admin_setting.dict())
-        
-        logger.info("Default data initialized")
-    except Exception as e:
-        logger.error(f"Error initializing default data: {e}")
-
-# Routes
-@api_router.get("/")
-async def root():
-    return {"message": "CreatorBoostal API v1.0.0", "status": "active"}
+# Dependency to get admin user
+async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != Role.admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
 
 # Health check
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.utcnow()}
 
-# Auth Routes
-@api_router.post("/auth/register", response_model=TokenResponse)
-async def register(user_data: UserCreate):
-    """Register a new user"""
-    user = await database.create_user(user_data)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already exists"
-        )
+# Authentication routes
+@api_router.post("/auth/register", response_model=AuthResponse)
+async def register(user_data: UserRegister):
+    # Check if user already exists
+    existing_user = await database.db.users.find_one({"email": user_data.email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create welcome notification
-    welcome_notification = Notification(
-        user_id=user.id,
-        type=NotificationType.CREDITS_EARNED,
-        title="Hoş Geldiniz!",
-        title_en="Welcome!",
-        message="CreatorBoostal'a hoş geldiniz! 10 bonus kredi kazandınız.",
-        message_en="Welcome to CreatorBoostal! You earned 10 bonus credits."
+    existing_username = await database.db.users.find_one({"username": user_data.username})
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    # Create new user
+    user = User(
+        id=str(ObjectId()),
+        email=user_data.email,
+        username=user_data.username,
+        password_hash=get_password_hash(user_data.password),
+        role=Role.user,
+        credits=0,
+        vip_package=VIPPackageStatus.none,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
-    await database.create_notification(welcome_notification)
     
-    # Give welcome credits
-    await database.update_user_credits(user.id, 10)
+    # Save to database
+    await database.db.users.insert_one(user.dict())
     
     # Create access token
-    access_token = create_access_token(data={"sub": user.username})
+    access_token = create_access_token(data={"sub": user.id})
     
-    user_response = UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        role=user.role.value,  # Convert enum to string
-        vip_package=user.vip_package.value if user.vip_package else None,  # Convert enum to string
-        vip_expires_at=user.vip_expires_at,
-        credits=10,  # Updated credits
-        language=user.language.value,  # Convert enum to string
-        is_following_creator=user.is_following_creator,
-        created_at=user.created_at
-    )
-    
-    return TokenResponse(access_token=access_token, user=user_response)
-
-@api_router.post("/auth/login", response_model=TokenResponse) 
-async def login(login_data: UserLogin):
-    """Login user"""
-    user = await database.authenticate_user(login_data.username, login_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password"
+    return AuthResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            username=user.username,
+            role=user.role,
+            credits=user.credits,
+            vip_package=user.vip_package,
+            created_at=user.created_at
         )
-    
-    access_token = create_access_token(data={"sub": user.username})
-    
-    user_response = UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        role=user.role.value,  # Convert enum to string
-        vip_package=user.vip_package.value if user.vip_package else None,  # Convert enum to string
-        vip_expires_at=user.vip_expires_at,
-        credits=user.credits,
-        language=user.language.value,  # Convert enum to string
-        is_following_creator=user.is_following_creator,
-        created_at=user.created_at
     )
+
+@api_router.post("/auth/login", response_model=AuthResponse)
+async def login(credentials: UserLogin):
+    # Find user
+    user_data = await database.db.users.find_one({"email": credentials.email})
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    return TokenResponse(access_token=access_token, user=user_response)
+    user = User(**user_data)
+    
+    # Verify password
+    if not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user.id})
+    
+    return AuthResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            username=user.username,
+            role=user.role,
+            credits=user.credits,
+            vip_package=user.vip_package,
+            created_at=user.created_at
+        )
+    )
 
 @api_router.get("/auth/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
-    """Get current user info"""
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
-        username=current_user.username,
         email=current_user.email,
-        role=current_user.role.value,  # Convert enum to string
-        vip_package=current_user.vip_package.value if current_user.vip_package else None,  # Convert enum to string
-        vip_expires_at=current_user.vip_expires_at,
+        username=current_user.username,
+        role=current_user.role,
         credits=current_user.credits,
-        language=current_user.language.value,  # Convert enum to string
-        is_following_creator=current_user.is_following_creator,
+        vip_package=current_user.vip_package,
         created_at=current_user.created_at
     )
 
-# Social Media Routes
-@api_router.post("/social/accounts", response_model=SocialAccount)
+# VIP endpoints
+@api_router.get("/vip/packages")
+async def get_vip_packages():
+    packages = await database.db.vip_packages.find({"is_active": True}).to_list(length=None)
+    return packages
+
+@api_router.post("/vip/purchase")
+async def purchase_vip_package(
+    purchase_data: VIPPurchaseRequest,
+    current_user: User = Depends(get_current_user)
+):
+    # Find the VIP package
+    package = await database.db.vip_packages.find_one({"id": purchase_data.package_id})
+    if not package:
+        raise HTTPException(status_code=404, detail="VIP package not found")
+    
+    # Create payment record
+    payment_record = {
+        "id": str(ObjectId()),
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "package_id": purchase_data.package_id,
+        "package_name": package["name"],
+        "amount": package["price"],
+        "payment_method": purchase_data.payment_method,
+        "status": "pending",
+        "created_at": datetime.utcnow(),
+        "notes": f"{purchase_data.payment_method} payment initiated"
+    }
+    
+    await database.db.payment_records.insert_one(payment_record)
+    
+    return {
+        "message": "Payment request created successfully",
+        "payment_id": payment_record["id"],
+        "status": "pending"
+    }
+
+# Payment management endpoints (Admin only)
+@api_router.get("/admin/payments")
+async def get_payment_records(admin_user: User = Depends(get_admin_user)):
+    payments = await database.db.payment_records.find().sort("created_at", -1).to_list(length=50)
+    
+    # Calculate stats
+    approved_payments = [p for p in payments if p["status"] == "approved"]
+    today = datetime.utcnow().date()
+    approved_today = [p for p in approved_payments if p["created_at"].date() == today]
+    
+    stats = {
+        "pending_payments": len([p for p in payments if p["status"] == "pending"]),
+        "approved_today": len(approved_today),
+        "mobile_payments": len([p for p in payments if p["payment_method"] == "mobile_payment"]),
+        "bank_transfers": len([p for p in payments if p["payment_method"] == "bank_transfer"]),
+        "crypto_payments": len([p for p in payments if p["payment_method"] == "crypto"]),
+        "total_revenue": sum(p["amount"] for p in approved_payments)
+    }
+    
+    return {"payments": payments, "stats": stats}
+
+@api_router.post("/admin/payments/{payment_id}/process")
+async def process_payment(
+    payment_id: str,
+    action: str,  # 'approve' or 'reject'
+    admin_user: User = Depends(get_admin_user)
+):
+    if action not in ['approve', 'reject']:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
+    # Find payment record
+    payment = await database.db.payment_records.find_one({"id": payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    if payment["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Payment already processed")
+    
+    # Update payment status
+    await database.db.payment_records.update_one(
+        {"id": payment_id},
+        {"$set": {"status": action, "processed_at": datetime.utcnow(), "processed_by": admin_user.id}}
+    )
+    
+    # If approved, grant VIP to user
+    if action == "approve":
+        package = await database.db.vip_packages.find_one({"id": payment["package_id"]})
+        if package:
+            vip_status = VIPPackageStatus.starter
+            if "pro" in package["name"].lower():
+                vip_status = VIPPackageStatus.pro
+            elif "premium" in package["name"].lower():
+                vip_status = VIPPackageStatus.premium
+                
+            # Update user VIP status
+            await database.db.users.update_one(
+                {"id": payment["user_id"]},
+                {"$set": {
+                    "vip_package": vip_status,
+                    "vip_expires_at": datetime.utcnow() + timedelta(days=package["duration_days"]),
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            
+            # Create notification for user
+            notification = {
+                "id": str(ObjectId()),
+                "user_id": payment["user_id"],
+                "title": "VIP Paket Aktif!",
+                "message": f"{package['name']} paketiniz onaylandı ve aktif edildi!",
+                "type": "vip_approved",
+                "is_read": False,
+                "created_at": datetime.utcnow()
+            }
+            await database.db.notifications.insert_one(notification)
+    
+    return {"message": f"Payment {action}d successfully"}
+
+# System reset endpoint (Admin only)
+@api_router.post("/admin/reset-system")
+async def reset_system(admin_user: User = Depends(get_admin_user)):
+    """Reset all data except admin accounts"""
+    try:
+        # Delete all non-admin users
+        await database.db.users.delete_many({"role": {"$ne": "admin"}})
+        
+        # Delete all payment records
+        await database.db.payment_records.delete_many({})
+        
+        # Delete all boosts
+        await database.db.boosts.delete_many({})
+        
+        # Delete all social accounts
+        await database.db.social_accounts.delete_many({})
+        
+        # Delete all forum topics (keep categories)
+        await database.db.forum_topics.delete_many({})
+        
+        # Delete all notifications
+        await database.db.notifications.delete_many({})
+        
+        # Reset admin users to remove VIP status (except admin role)
+        await database.db.users.update_many(
+            {"role": "admin"},
+            {"$set": {
+                "vip_package": VIPPackageStatus.none,
+                "credits": 0,
+                "vip_expires_at": None,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        logger.info(f"System reset performed by admin: {admin_user.email}")
+        return {"message": "System reset completed successfully"}
+        
+    except Exception as e:
+        logger.error(f"System reset failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="System reset failed")
+
+# Social media endpoints
+@api_router.get("/social/discover")
+async def discover_accounts(skip: int = 0, limit: int = 20):
+    # Mock data for now - in real app would get boosted accounts
+    mock_accounts = [
+        {
+            "id": str(ObjectId()),
+            "platform": "instagram",
+            "username": "mhmmtcvlk",
+            "display_name": "Muhammet Civelek",
+            "followers_count": 15420,
+            "user_id": "mock_user_1",
+            "boost_active": True,
+            "boost_expires_at": datetime.utcnow() + timedelta(hours=6)
+        }
+    ]
+    return mock_accounts
+
+@api_router.post("/social/create")
 async def create_social_account(
     account_data: SocialAccountCreate,
     current_user: User = Depends(get_current_user)
 ):
-    """Create social media account"""
-    account = await database.create_social_account(current_user.id, account_data)
-    if not account:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error creating social account"
-        )
-    return account
+    social_account = SocialAccount(
+        id=str(ObjectId()),
+        user_id=current_user.id,
+        platform=account_data.platform,
+        username=account_data.username,
+        display_name=account_data.display_name,
+        description=account_data.description,
+        followers_count=account_data.followers_count,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    
+    await database.db.social_accounts.insert_one(social_account.dict())
+    return {"message": "Social account created successfully"}
 
-@api_router.get("/social/discover", response_model=List[SocialAccount])
-async def discover_accounts(skip: int = 0, limit: int = 20):
-    """Discover social media accounts"""
-    return await database.get_social_accounts(limit=limit, skip=skip)
-
-# Boost Routes
-@api_router.post("/boost/create", response_model=Boost)
+# Boost endpoints
+@api_router.post("/boost/create")
 async def create_boost(
     boost_data: BoostCreate,
     current_user: User = Depends(get_current_user)
 ):
-    """Create a boost"""
-    boost = await database.create_boost(current_user.id, boost_data)
-    if not boost:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Insufficient credits or error creating boost"
+    # Check if user has enough credits
+    if current_user.credits < boost_data.credits_spent:
+        raise HTTPException(status_code=400, detail="Insufficient credits")
+    
+    # Create boost record
+    boost = Boost(
+        id=str(ObjectId()),
+        user_id=current_user.id,
+        social_account_id=boost_data.social_account_id,
+        duration_hours=boost_data.duration_hours,
+        credits_spent=boost_data.credits_spent,
+        status=BoostStatus.active,
+        expires_at=datetime.utcnow() + timedelta(hours=boost_data.duration_hours),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    
+    await database.db.boosts.insert_one(boost.dict())
+    
+    # Deduct credits from user
+    await database.db.users.update_one(
+        {"id": current_user.id},
+        {"$inc": {"credits": -boost_data.credits_spent}, "$set": {"updated_at": datetime.utcnow()}}
+    )
+    
+    return {"message": "Boost created successfully", "boost_id": boost.id}
+
+# Credits endpoints
+@api_router.post("/credits/watch-ad")
+async def watch_ad(current_user: User = Depends(get_current_user)):
+    # Award credits for watching ad
+    credits_earned = 5
+    await database.db.users.update_one(
+        {"id": current_user.id},
+        {"$inc": {"credits": credits_earned}, "$set": {"updated_at": datetime.utcnow()}}
+    )
+    
+    return {"credits_earned": credits_earned}
+
+@api_router.post("/credits/follow-creator")
+async def follow_creator(current_user: User = Depends(get_current_user)):
+    # Award credits for following creator
+    credits_earned = 10
+    await database.db.users.update_one(
+        {"id": current_user.id},
+        {"$inc": {"credits": credits_earned}, "$set": {"updated_at": datetime.utcnow()}}
+    )
+    
+    return {"credits_earned": credits_earned}
+
+# Forum endpoints
+@api_router.get("/forum/categories")
+async def get_forum_categories():
+    categories = await database.db.forum_categories.find().to_list(length=None)
+    return categories
+
+@api_router.get("/forum/topics")
+async def get_forum_topics(category_id: Optional[str] = None, skip: int = 0, limit: int = 20):
+    query = {}
+    if category_id:
+        query["category_id"] = category_id
+    
+    topics = await database.db.forum_topics.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(length=None)
+    return topics
+
+# Notifications endpoints
+@api_router.get("/notifications")
+async def get_notifications(current_user: User = Depends(get_current_user)):
+    notifications = await database.db.notifications.find({"user_id": current_user.id}).sort("created_at", -1).limit(20).to_list(length=None)
+    return notifications
+
+@api_router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    await database.db.notifications.update_one(
+        {"id": notification_id, "user_id": current_user.id},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "Notification marked as read"}
+
+# Admin endpoints
+@api_router.get("/admin/stats")
+async def get_admin_stats(admin_user: User = Depends(get_admin_user)):
+    total_users = await database.db.users.count_documents({})
+    vip_users = await database.db.users.count_documents({"vip_package": {"$ne": VIPPackageStatus.none}})
+    total_boosts = await database.db.boosts.count_documents({})
+    active_boosts = await database.db.boosts.count_documents({"status": BoostStatus.active})
+    total_topics = await database.db.forum_topics.count_documents({})
+    total_social_accounts = await database.db.social_accounts.count_documents({})
+    
+    # Payment stats
+    payments = await database.db.payment_records.find({"status": "approved"}).to_list(length=None)
+    total_vip_purchases = len(payments)
+    revenue = sum(p["amount"] for p in payments)
+    
+    return {
+        "total_users": total_users,
+        "vip_users": vip_users,
+        "total_boosts": total_boosts,
+        "active_boosts": active_boosts,
+        "total_topics": total_topics,
+        "total_social_accounts": total_social_accounts,
+        "total_vip_purchases": total_vip_purchases,
+        "revenue": revenue
+    }
+
+@api_router.get("/admin/users")
+async def get_admin_users(admin_user: User = Depends(get_admin_user)):
+    users = await database.db.users.find({}).to_list(length=None)
+    return [UserResponse(
+        id=user["id"],
+        email=user["email"],
+        username=user["username"],
+        role=user["role"],
+        credits=user["credits"],
+        vip_package=user.get("vip_package", VIPPackageStatus.none),
+        created_at=user["created_at"]
+    ) for user in users]
+
+@api_router.put("/admin/users/{user_id}/role")
+async def update_user_role(
+    user_id: str,
+    new_role: Role,
+    admin_user: User = Depends(get_admin_user)
+):
+    result = await database.db.users.update_one(
+        {"id": user_id},
+        {"$set": {"role": new_role, "updated_at": datetime.utcnow()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "User role updated successfully"}
+
+@api_router.put("/admin/users/{user_id}/credits")
+async def update_user_credits(
+    user_id: str,
+    credits: int,
+    admin_user: User = Depends(get_admin_user)
+):
+    result = await database.db.users.update_one(
+        {"id": user_id},
+        {"$set": {"credits": credits, "updated_at": datetime.utcnow()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "User credits updated successfully"}
+
+@api_router.post("/admin/broadcast")
+async def broadcast_message(
+    message_data: BroadcastMessage,
+    admin_user: User = Depends(get_admin_user)
+):
+    # Get all users
+    users = await database.db.users.find({}).to_list(length=None)
+    
+    # Create notifications for all users
+    notifications = []
+    for user in users:
+        notification = {
+            "id": str(ObjectId()),
+            "user_id": user["id"],
+            "title": message_data.title,
+            "message": message_data.message,
+            "type": "broadcast",
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        notifications.append(notification)
+    
+    if notifications:
+        await database.db.notifications.insert_many(notifications)
+    
+    return {"message": f"Broadcast sent to {len(users)} users"}
+
+@api_router.get("/admin/settings")
+async def get_admin_settings(admin_user: User = Depends(get_admin_user)):
+    settings = await database.db.admin_settings.find().to_list(length=None)
+    return settings
+
+@api_router.put("/admin/settings")
+async def update_admin_settings(
+    settings_data: dict,
+    admin_user: User = Depends(get_admin_user)
+):
+    # Update each setting
+    for key, value in settings_data.items():
+        await database.db.admin_settings.update_one(
+            {"key": key},
+            {"$set": {"value": value, "updated_at": datetime.utcnow()}},
+            upsert=True
         )
     
-    # Create notification
-    notification = Notification(
-        user_id=current_user.id,
-        type=NotificationType.BOOST_ACTIVATED,
-        title="Boost Aktifleşti!",
-        title_en="Boost Activated!",
-        message=f"Hesabınız {boost_data.duration_hours} saat boyunca boost alacak.",
-        message_en=f"Your account will be boosted for {boost_data.duration_hours} hours."
-    )
-    await database.create_notification(notification)
-    
-    return boost
-
-@api_router.get("/vip/packages", response_model=List[VipPackageInfo])
-async def get_vip_packages():
-    """Get VIP packages"""
-    return await database.get_vip_packages()
+    return {"message": "Admin settings updated successfully"}
 
 @api_router.put("/admin/vip/packages/{package_id}")
 async def update_vip_package(
@@ -440,312 +590,187 @@ async def update_vip_package(
     
     return {"message": "VIP package updated successfully"}
 
-# Forum Routes
-@api_router.get("/forum/categories", response_model=List[ForumCategory])
-async def get_forum_categories():
-    """Get forum categories"""
-    return await database.get_forum_categories()
-
-@api_router.get("/forum/topics", response_model=List[ForumTopic])
-async def get_forum_topics(category_id: Optional[str] = None, skip: int = 0, limit: int = 20):
-    """Get forum topics"""
-    return await database.get_forum_topics(category_id=category_id, skip=skip, limit=limit)
-
-@api_router.post("/forum/topics", response_model=ForumTopic)
-async def create_forum_topic(
-    topic_data: ForumTopicCreate,
-    current_user: User = Depends(get_current_user)
-):
-    """Create forum topic"""
-    topic = await database.create_forum_topic(current_user.id, topic_data)
-    if not topic:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error creating forum topic"
-        )
-    return topic
-
-# Notification Routes
-@api_router.get("/notifications", response_model=List[Notification])
-async def get_notifications(current_user: User = Depends(get_current_user)):
-    """Get user notifications"""
-    return await database.get_user_notifications(current_user.id)
-
-@api_router.post("/notifications/{notification_id}/read")
-async def mark_notification_read(
-    notification_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Mark notification as read"""
-    result = await database.db.notifications.update_one(
-        {"id": notification_id, "user_id": current_user.id},
-        {"$set": {"is_read": True}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Notification not found"
-        )
-    return {"message": "Notification marked as read"}
-
-# Credits and Rewards Routes
-@api_router.post("/rewards/ad-watched")
-async def reward_ad_watched(current_user: User = Depends(get_current_user)):
-    """Reward user for watching ad"""
-    # Check daily limit
-    today = datetime.utcnow().date()
-    if current_user.last_ad_reset.date() != today:
-        # Reset daily counter
-        await database.db.users.update_one(
-            {"id": current_user.id},
-            {"$set": {"daily_ads_watched": 0, "last_ad_reset": datetime.utcnow()}}
-        )
-        current_user.daily_ads_watched = 0
-    
-    if current_user.daily_ads_watched >= 5:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Daily ad limit reached"
-        )
-    
-    # Give credits and update counter
-    await database.update_user_credits(current_user.id, 5)
-    await database.db.users.update_one(
-        {"id": current_user.id},
-        {"$inc": {"daily_ads_watched": 1}}
-    )
-    
-    # Create ad reward record
-    ad_reward = AdReward(user_id=current_user.id)
-    await database.db.ad_rewards.insert_one(ad_reward.dict())
-    
-    # Create notification
-    notification = Notification(
-        user_id=current_user.id,
-        type=NotificationType.CREDITS_EARNED,
-        title="Kredi Kazandınız!",
-        title_en="Credits Earned!",
-        message="Reklam izlediğiniz için 5 kredi kazandınız.",
-        message_en="You earned 5 credits for watching an ad."
-    )
-    await database.create_notification(notification)
-    
-    return {"message": "5 credits awarded", "total_credits": current_user.credits + 5}
-
-# Follow Creator Route
-@api_router.post("/follow-creator")
-async def follow_creator(current_user: User = Depends(get_current_user)):
-    """Mark user as following creator and give reward"""
-    if current_user.is_following_creator:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Already following creator"
-        )
-    
-    # Update user
-    await database.db.users.update_one(
-        {"id": current_user.id},
-        {"$set": {"is_following_creator": True}, "$inc": {"credits": 10}}
-    )
-    
-    # Create notification  
-    notification = Notification(
-        user_id=current_user.id,
-        type=NotificationType.CREDITS_EARNED,
-        title="Takip Ödülü!",
-        title_en="Follow Reward!",
-        message="@mhmmtcvlk'ı takip ettiğiniz için 10 kredi kazandınız!",
-        message_en="You earned 10 credits for following @mhmmtcvlk!"
-    )
-    await database.create_notification(notification)
-    
-    return {"message": "Creator followed, 10 credits awarded"}
-
-# Admin Routes
-@api_router.get("/admin/users", response_model=List[UserResponse])
-async def get_all_users(admin_user: User = Depends(get_admin_user)):
-    """Get all users (admin only)"""
-    cursor = database.db.users.find()
-    users = []
-    async for user_doc in cursor:
-        user = User(**user_doc)
-        users.append(UserResponse(
-            id=user.id,
-            username=user.username,
-            email=user.email,
-            role=user.role,
-            vip_package=user.vip_package,
-            vip_expires_at=user.vip_expires_at,
-            credits=user.credits,
-            language=user.language,
-            is_following_creator=user.is_following_creator,
-            created_at=user.created_at
-        ))
-    return users
-
-@api_router.put("/admin/users/{user_id}/role")
-async def update_user_role(
-    user_id: str,
-    new_role: UserRole,
-    admin_user: User = Depends(get_admin_user)
-):
-    """Update user role (admin only)"""
-    result = await database.db.users.update_one(
-        {"id": user_id},
-        {"$set": {"role": new_role}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return {"message": f"User role updated to {new_role}"}
-
-@api_router.put("/admin/users/{user_id}/credits")
-async def update_user_credits_admin(
-    user_id: str,
-    credits: int,
-    admin_user: User = Depends(get_admin_user)
-):
-    """Update user credits (admin only)"""
-    result = await database.db.users.update_one(
-        {"id": user_id},
-        {"$set": {"credits": credits}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return {"message": f"User credits updated to {credits}"}
-
-@api_router.delete("/admin/users/{user_id}")
-async def delete_user(
-    user_id: str,
-    admin_user: User = Depends(get_admin_user)
-):
-    """Delete user (admin only)"""
-    result = await database.db.users.delete_one({"id": user_id})
-    if result.deleted_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return {"message": "User deleted successfully"}
-
-@api_router.get("/admin/settings")
-async def get_admin_settings(admin_user: User = Depends(get_admin_user)):
-    """Get admin settings"""
-    cursor = database.db.admin_settings.find()
-    settings = {}
-    async for doc in cursor:
-        settings[doc["key"]] = doc["value"]
-    return settings
-
-@api_router.put("/admin/settings")
-async def update_admin_settings(
-    settings: dict,
-    admin_user: User = Depends(get_admin_user)
-):
-    """Update admin settings"""
-    for key, value in settings.items():
-        await database.db.admin_settings.update_one(
-            {"key": key},
-            {"$set": {"value": value, "updated_at": datetime.utcnow()}},
-            upsert=True
-        )
-    return {"message": "Settings updated successfully"}
-
-@api_router.get("/admin/stats")
-async def get_admin_stats(admin_user: User = Depends(get_admin_user)):
-    """Get platform statistics"""
-    total_users = await database.db.users.count_documents({})
-    vip_users = await database.db.users.count_documents({"role": {"$in": ["vip", "admin"]}})
-    total_boosts = await database.db.boosts.count_documents({})
-    active_boosts = await database.db.boosts.count_documents({"is_active": True})
-    total_topics = await database.db.forum_topics.count_documents({})
-    total_social_accounts = await database.db.social_accounts.count_documents({})
-    
-    # Revenue calculation (mock for now)
-    total_vip_purchases = await database.db.vip_purchases.count_documents({"payment_status": "approved"})
-    
-    return {
-        "total_users": total_users,
-        "vip_users": vip_users,
-        "total_boosts": total_boosts,
-        "active_boosts": active_boosts,
-        "total_topics": total_topics,
-        "total_social_accounts": total_social_accounts,
-        "total_vip_purchases": total_vip_purchases,
-        "revenue": total_vip_purchases * 50.0  # Mock revenue calculation
-    }
-
-@api_router.post("/admin/broadcast")
-async def broadcast_message(
-    title: str,
-    message: str,
-    admin_user: User = Depends(get_admin_user)
-):
-    """Broadcast message to all users"""
-    cursor = database.db.users.find()
-    users_notified = 0
-    
-    async for user_doc in cursor:
-        notification = Notification(
-            user_id=user_doc["id"],
-            type=NotificationType.NEW_MESSAGE,
-            title=title,
-            title_en=title,  # For simplicity using same title
-            message=message,
-            message_en=message
-        )
-        await database.create_notification(notification)
-        users_notified += 1
-    
-    return {"message": f"Message broadcasted to {users_notified} users"}
-
-@api_router.post("/admin/vip/{user_id}")
-async def grant_vip(
-    user_id: str,
-    package: VipPackage,
-    duration_days: int = 30,
-    admin_user: User = Depends(get_admin_user)
-):
-    """Grant VIP to user (admin only)"""
-    expires_at = datetime.utcnow() + timedelta(days=duration_days)
-    
-    result = await database.db.users.update_one(
-        {"id": user_id},
-        {
-            "$set": {
-                "role": UserRole.VIP,
-                "vip_package": package,
-                "vip_expires_at": expires_at
-            }
-        }
-    )
-    
-    if result.modified_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # Create notification
-    notification = Notification(
-        user_id=user_id,
-        type=NotificationType.VIP_APPROVED,
-        title="VIP Üyeliğiniz Onaylandı!",
-        title_en="Your VIP Membership Approved!",
-        message=f"{package.upper()} paketiniz {duration_days} gün boyunca aktif.",
-        message_en=f"Your {package.upper()} package is active for {duration_days} days."
-    )
-    await database.create_notification(notification)
-    
-    return {"message": f"VIP {package} granted to user for {duration_days} days"}
-
-# Include router
+# Add the API router to the main app
 app.include_router(api_router)
+
+# Database initialization
+@app.on_event("startup")
+async def startup_event():
+    await database.connect()
+    
+    # Create indexes
+    await database.create_indexes()
+    
+    # Initialize default data
+    await initialize_default_data()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await database.disconnect()
+
+async def initialize_default_data():
+    """Initialize default data for the application"""
+    
+    # Check if admin user exists, if not create one
+    admin_user = await database.db.users.find_one({"email": "mhmmdc83@gmail.com"})
+    if not admin_user:
+        admin_user_data = User(
+            id=str(ObjectId()),
+            email="mhmmdc83@gmail.com",
+            username="admin",
+            password_hash=get_password_hash("admin123"),
+            role=Role.admin,
+            credits=0,
+            vip_package=VIPPackageStatus.none,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        await database.db.users.insert_one(admin_user_data.dict())
+        logger.info("Admin user created")
+    else:
+        # Update existing admin user to ensure admin role
+        await database.db.users.update_one(
+            {"email": "mhmmdc83@gmail.com"},
+            {"$set": {"role": Role.admin, "updated_at": datetime.utcnow()}}
+        )
+        logger.info("User updated to admin: mhmmdc83@gmail.com")
+    
+    # Initialize VIP packages if they don't exist
+    vip_packages_count = await database.db.vip_packages.count_documents({})
+    if vip_packages_count == 0:
+        default_packages = [
+            {
+                "id": str(ObjectId()),
+                "name": "VIP Starter",
+                "price": 19.99,
+                "duration_days": 30,
+                "features": [
+                    "Boost önceliği",
+                    "Temel AI yardımcısı",
+                    "Email destek",
+                    "5x hızlı boost"
+                ],
+                "description": "Sosyal medya yolculuğunuza başlamak için ideal paket",
+                "is_popular": False,
+                "is_active": True,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            },
+            {
+                "id": str(ObjectId()),
+                "name": "VIP Pro",
+                "price": 49.99,
+                "duration_days": 30,
+                "features": [
+                    "Yüksek boost önceliği",
+                    "Gelişmiş AI yardımcısı",
+                    "Öncelikli destek",
+                    "10x hızlı boost",
+                    "Detaylı analitikler",
+                    "Özel rozet"
+                ],
+                "description": "Profesyonel büyüme için en popüler seçim",
+                "is_popular": True,
+                "is_active": True,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            },
+            {
+                "id": str(ObjectId()),
+                "name": "VIP Premium",
+                "price": 99.99,
+                "duration_days": 30,
+                "features": [
+                    "Maximum boost önceliği",
+                    "Premium AI yardımcısı",
+                    "7/24 özel destek",
+                    "20x hızlı boost",
+                    "Gelişmiş analitikler",
+                    "Altın rozet",
+                    "Özel özellikler",
+                    "API erişimi"
+                ],
+                "description": "Sınırsız büyüme ve tüm premium özellikler",
+                "is_popular": False,
+                "is_active": True,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        ]
+        await database.db.vip_packages.insert_many(default_packages)
+        logger.info("Default VIP packages created")
+    
+    # Initialize forum categories if they don't exist
+    categories_count = await database.db.forum_categories.count_documents({})
+    if categories_count == 0:
+        default_categories = [
+            {
+                "id": str(ObjectId()),
+                "name": "Instagram",
+                "description": "Instagram hesap büyütme stratejileri",
+                "color": "#E4405F",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            },
+            {
+                "id": str(ObjectId()),
+                "name": "TikTok",
+                "description": "TikTok viral olma ipuçları",
+                "color": "#000000",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            },
+            {
+                "id": str(ObjectId()),
+                "name": "Twitter",
+                "description": "Twitter engagement artırma",
+                "color": "#1DA1F2",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            },
+            {
+                "id": str(ObjectId()),
+                "name": "YouTube",
+                "description": "YouTube kanal büyütme rehberleri",
+                "color": "#FF0000",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            },
+            {
+                "id": str(ObjectId()),
+                "name": "Genel",
+                "description": "Genel sosyal medya konuları",
+                "color": "#6C5CE7",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        ]
+        await database.db.forum_categories.insert_many(default_categories)
+        logger.info("Default forum categories created")
+    
+    # Initialize admin settings if they don't exist
+    settings_count = await database.db.admin_settings.count_documents({})
+    if settings_count == 0:
+        default_settings = [
+            {"key": "telegram_bot_token", "value": "", "description": "Telegram bot token for notifications"},
+            {"key": "telegram_channel_id", "value": "", "description": "Telegram channel ID for notifications"},
+            {"key": "instagram_api_key", "value": "", "description": "Instagram API key for integration"},
+            {"key": "company_name", "value": "CreatorBoostal Ltd.", "description": "Company name for legal documents"},
+            {"key": "company_address", "value": "İstanbul, Türkiye", "description": "Company address"},
+            {"key": "company_email", "value": "info@creatorboostal.com", "description": "Contact email address"},
+            {"key": "company_phone", "value": "+90 555 123 4567", "description": "Contact phone number"},
+            {"key": "ai_model_provider", "value": "openai", "description": "AI model provider (openai, anthropic, google)"},
+            {"key": "ai_api_key", "value": "", "description": "AI service API key"}
+        ]
+        
+        for setting in default_settings:
+            setting["created_at"] = datetime.utcnow()
+            setting["updated_at"] = datetime.utcnow()
+        
+        await database.db.admin_settings.insert_many(default_settings)
+        logger.info("Default admin settings created")
+    
+    logger.info("Default data initialized")
 
 if __name__ == "__main__":
     import uvicorn
