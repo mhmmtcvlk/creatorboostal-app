@@ -4,15 +4,15 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  RefreshControl,
   Pressable,
   Alert,
+  Modal,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
-import { useLanguage } from '../../contexts/LanguageContext';
 import { colors } from '../../constants/theme';
 import { GradientButton } from '../../components/GradientButton';
 import { apiClient } from '../../services/api';
@@ -22,166 +22,197 @@ interface CreditActivity {
   type: 'earned' | 'spent';
   amount: number;
   description: string;
-  timestamp: Date;
+  timestamp: string;
 }
 
+interface AdReward {
+  credits: number;
+  description: string;
+  available: boolean;
+  cooldown?: number;
+}
+
+const AD_REWARDS: AdReward[] = [
+  { credits: 5, description: 'Video reklam izle', available: true },
+  { credits: 3, description: 'Banner reklam görüntüle', available: true },
+  { credits: 10, description: 'Özel teklif reklamı', available: true },
+];
+
 export default function CreditsTab() {
-  const { user, updateUser } = useAuth();
-  const { t } = useLanguage();
-  const [refreshing, setRefreshing] = useState(false);
+  const { user, refreshUser } = useAuth();
+  const [activities, setActivities] = useState<CreditActivity[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [selectedAd, setSelectedAd] = useState<AdReward | null>(null);
+  const [adAnimation] = useState(new Animated.Value(0));
   const [dailyAdsWatched, setDailyAdsWatched] = useState(0);
-  const [activities] = useState<CreditActivity[]>([
-    {
-      id: '1',
-      type: 'earned',
-      amount: 10,
-      description: 'Hoş geldin bonusu',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    },
-    {
-      id: '2',
-      type: 'earned',
-      amount: 5,
-      description: 'Reklam izleme',
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-    },
-    {
-      id: '3',
-      type: 'spent',
-      amount: -24,
-      description: 'Instagram hesabı boost (24 saat)',
-      timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-    },
-  ]);
+  const [followCreatorUsed, setFollowCreatorUsed] = useState(false);
 
-  const loadUserData = async () => {
-    try {
-      const userData = await apiClient.getMe();
-      updateUser(userData);
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
+  useEffect(() => {
+    loadActivities();
+    checkDailyLimits();
+  }, []);
+
+  const loadActivities = async () => {
+    // Mock activities for demo
+    const mockActivities: CreditActivity[] = [
+      { id: '1', type: 'earned', amount: 5, description: 'Video reklam izlendi', timestamp: new Date().toISOString() },
+      { id: '2', type: 'spent', amount: 50, description: 'Hesap boost edildi', timestamp: new Date(Date.now() - 3600000).toISOString() },
+      { id: '3', type: 'earned', amount: 10, description: '@mhmmtcvlk takip edildi', timestamp: new Date(Date.now() - 7200000).toISOString() },
+      { id: '4', type: 'earned', amount: 3, description: 'Banner reklam görüntülendi', timestamp: new Date(Date.now() - 10800000).toISOString() },
+    ];
+    setActivities(mockActivities);
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadUserData();
-    setRefreshing(false);
-  };
-
-  const handleWatchAd = async () => {
-    if (dailyAdsWatched >= 5) {
-      Alert.alert('Limit Doldu', 'Günde maksimum 5 reklam izleyebilirsiniz. Yarın tekrar deneyin.');
-      return;
-    }
-
-    try {
-      // Simulate ad watching
-      setTimeout(async () => {
-        try {
-          const result = await apiClient.watchAd();
-          setDailyAdsWatched(prev => prev + 1);
-          Alert.alert('Tebrikler!', `5 kredi kazandınız! Toplam krediniz: ${result.total_credits}`);
-          await loadUserData();
-        } catch (error: any) {
-          Alert.alert('Hata', error.response?.data?.detail || 'Bir hata oluştu');
-        }
-      }, 2000); // Simulate 2 second ad
-
-      Alert.alert('Reklam Oynatılıyor', 'Lütfen bekleyin...');
-    } catch (error) {
-      Alert.alert('Hata', 'Reklam yüklenemedi');
-    }
-  };
-
-  const handleFollowCreator = async () => {
-    if (user?.is_following_creator) {
-      Alert.alert('Bilgi', 'Zaten takip ediyorsunuz!');
-      return;
-    }
-
-    try {
-      const result = await apiClient.followCreator();
-      Alert.alert('Tebrikler!', result.message);
-      await loadUserData();
-    } catch (error: any) {
-      Alert.alert('Hata', error.response?.data?.detail || 'Bir hata oluştu');
-    }
-  };
-
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const hours = Math.floor(diff / 1000 / 60 / 60);
+  const checkDailyLimits = () => {
+    // In a real app, this would check actual usage from server
+    const today = new Date().toDateString();
+    const storedDate = localStorage?.getItem('creditsDate');
+    const storedAds = localStorage?.getItem('dailyAds');
+    const storedFollow = localStorage?.getItem('followCreatorUsed');
     
-    if (hours < 1) return 'Az önce';
-    if (hours < 24) return `${hours} saat önce`;
-    const days = Math.floor(hours / 24);
-    return `${days} gün önce`;
+    if (storedDate !== today) {
+      setDailyAdsWatched(0);
+      setFollowCreatorUsed(false);
+      localStorage?.setItem('creditsDate', today);
+      localStorage?.setItem('dailyAds', '0');
+      localStorage?.setItem('followCreatorUsed', 'false');
+    } else {
+      setDailyAdsWatched(parseInt(storedAds || '0'));
+      setFollowCreatorUsed(storedFollow === 'true');
+    }
   };
 
-  const earnMethods = [
-    {
-      id: 'ad',
-      title: 'Reklam İzle',
-      subtitle: `Günlük ${5 - dailyAdsWatched}/5 kalan`,
-      icon: 'play-circle',
-      reward: '+5 Kredi',
-      gradient: colors.gradient.primary,
-      disabled: dailyAdsWatched >= 5,
-      onPress: handleWatchAd,
-    },
-    {
-      id: 'follow',
-      title: 'Creator\'ı Takip Et',
-      subtitle: user?.is_following_creator ? 'Tamamlandı' : '@mhmmtcvlk',
-      icon: 'favorite',
-      reward: '+10 Kredi',
-      gradient: ['#E17055', '#FDCB6E'],
-      disabled: user?.is_following_creator,
-      onPress: handleFollowCreator,
-    },
-    {
-      id: 'invite',
-      title: 'Arkadaş Davet Et',
-      subtitle: 'Referans kodunu paylaş',
-      icon: 'person-add',
-      reward: '+25 Kredi',
-      gradient: ['#00B894', '#55EFC4'],
-      disabled: false,
-      onPress: () => Alert.alert('Bilgi', 'Referans sistemi yakında aktif olacak'),
-    },
-    {
-      id: 'daily',
-      title: 'Günlük Giriş',
-      subtitle: 'Her gün giriş yap',
-      icon: 'calendar-today',
-      reward: '+3 Kredi',
-      gradient: ['#A29BFE', '#6C5CE7'],
-      disabled: false,
-      onPress: () => Alert.alert('Bilgi', 'Günlük giriş bonusu yakında aktif olacak'),
-    },
-  ];
+  const watchAd = async (adReward: AdReward) => {
+    if (dailyAdsWatched >= 5) {
+      Alert.alert('Günlük Limit', 'Günde maksimum 5 reklam izleyerek kredi kazanabilirsiniz');
+      return;
+    }
+
+    setSelectedAd(adReward);
+    setShowAdModal(true);
+    
+    // Simulate ad loading and playing
+    Animated.sequence([
+      Animated.timing(adAnimation, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Simulate ad completion after 3 seconds
+    setTimeout(async () => {
+      try {
+        await apiClient.watchAd();
+        
+        const newAdsCount = dailyAdsWatched + 1;
+        setDailyAdsWatched(newAdsCount);
+        localStorage?.setItem('dailyAds', newAdsCount.toString());
+        
+        await refreshUser();
+        setShowAdModal(false);
+        
+        Alert.alert(
+          '🎉 Kredi Kazandın!',
+          `${adReward.credits} kredi hesabına eklendi!\n\nKalan günlük reklam hakkın: ${5 - newAdsCount}`,
+          [{ text: 'Harika!' }]
+        );
+        
+        // Add to activities
+        const newActivity: CreditActivity = {
+          id: Date.now().toString(),
+          type: 'earned',
+          amount: adReward.credits,
+          description: adReward.description,
+          timestamp: new Date().toISOString(),
+        };
+        setActivities(prev => [newActivity, ...prev]);
+        
+      } catch (error) {
+        Alert.alert('Hata', 'Kredi eklenemedi. Lütfen tekrar deneyin.');
+      }
+      
+      adAnimation.setValue(0);
+    }, 3000);
+  };
+
+  const followCreator = async () => {
+    if (followCreatorUsed) {
+      Alert.alert('Zaten Kullanıldı', 'Bu günlük ödülü zaten aldınız');
+      return;
+    }
+
+    Alert.alert(
+      '👨‍💼 Yaratıcıyı Takip Et',
+      '@mhmmtcvlk hesabını Instagram\'da takip ederek 10 kredi kazan!\n\nTakip ettikten sonra "Tamamladım" butonuna bas.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Instagram Aç', onPress: () => openInstagram() },
+        { text: 'Tamamladım', onPress: () => confirmFollow() }
+      ]
+    );
+  };
+
+  const openInstagram = () => {
+    // In a real app, this would open Instagram
+    Alert.alert('Instagram', 'Instagram uygulaması açılıyor...\n\n@mhmmtcvlk hesabını takip etmeyi unutmayın!');
+  };
+
+  const confirmFollow = async () => {
+    try {
+      await apiClient.followCreator();
+      
+      setFollowCreatorUsed(true);
+      localStorage?.setItem('followCreatorUsed', 'true');
+      
+      await refreshUser();
+      
+      Alert.alert(
+        '🎉 Tebrikler!',
+        '10 kredi kazandın! @mhmmtcvlk\'i takip ettiğin için teşekkürler!',
+        [{ text: 'Harika!' }]
+      );
+      
+      // Add to activities
+      const newActivity: CreditActivity = {
+        id: Date.now().toString(),
+        type: 'earned',
+        amount: 10,
+        description: '@mhmmtcvlk takip edildi',
+        timestamp: new Date().toISOString(),
+      };
+      setActivities(prev => [newActivity, ...prev]);
+      
+    } catch (error) {
+      Alert.alert('Hata', 'Kredi eklenemedi. Lütfen tekrar deneyin.');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getRemainingAds = () => Math.max(0, 5 - dailyAdsWatched);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Krediler</Text>
-        <View style={styles.creditsBadge}>
-          <MaterialIcons name="stars" size={20} color={colors.warning} />
-          <Text style={styles.creditsText}>{user?.credits || 0}</Text>
-        </View>
+        <Pressable style={styles.infoButton}>
+          <MaterialIcons name="info" size={24} color={colors.text} />
+        </Pressable>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        {/* Credits Balance Card */}
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Credits Balance */}
         <LinearGradient
           colors={colors.gradient.primary}
           style={styles.balanceCard}
@@ -189,122 +220,205 @@ export default function CreditsTab() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.balanceContent}>
-            <Text style={styles.balanceLabel}>Toplam Kredin</Text>
-            <Text style={styles.balanceAmount}>{user?.credits || 0}</Text>
-            <Text style={styles.balanceSubtext}>1 Kredi = 1 Saatlik Boost</Text>
+            <MaterialIcons name="account-balance-wallet" size={48} color="white" />
+            <Text style={styles.balanceTitle}>Mevcut Bakiye</Text>
+            <Text style={styles.balanceAmount}>{user?.credits || 0} KREDİ</Text>
+            <Text style={styles.balanceSubtitle}>
+              Boost işlemleri ve premium özellikler için kullan
+            </Text>
           </View>
-          <MaterialIcons name="account-balance-wallet" size={64} color="rgba(255,255,255,0.3)" />
         </LinearGradient>
 
-        {/* Earn Credits Section */}
+        {/* Earn Credits */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kredi Kazan</Text>
-          <View style={styles.earnMethodsList}>
-            {earnMethods.map((method) => (
-              <Pressable
-                key={method.id}
-                style={[styles.earnCard, method.disabled && styles.disabledCard]}
-                onPress={method.onPress}
-                disabled={method.disabled}
-                android_ripple={{ color: colors.primary + '20' }}
-              >
-                <LinearGradient
-                  colors={method.disabled ? ['#555', '#555'] : method.gradient}
-                  style={styles.earnGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <MaterialIcons 
-                    name={method.icon as any} 
-                    size={32} 
-                    color={method.disabled ? '#999' : 'white'} 
-                  />
-                </LinearGradient>
-                
-                <View style={styles.earnInfo}>
-                  <Text style={[styles.earnTitle, method.disabled && styles.disabledText]}>
-                    {method.title}
-                  </Text>
-                  <Text style={[styles.earnSubtitle, method.disabled && styles.disabledText]}>
-                    {method.subtitle}
-                  </Text>
-                </View>
-                
-                <View style={styles.earnReward}>
-                  <Text style={[styles.rewardText, method.disabled && styles.disabledText]}>
-                    {method.reward}
-                  </Text>
-                  {!method.disabled && (
-                    <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-                  )}
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* VIP Benefits */}
-        <View style={styles.section}>
-          <LinearGradient
-            colors={['#6C5CE7', '#A29BFE']}
-            style={styles.vipCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <MaterialIcons name="star" size={40} color="white" />
-            <View style={styles.vipContent}>
-              <Text style={styles.vipTitle}>VIP Ol, Daha Fazla Kazan!</Text>
-              <Text style={styles.vipSubtitle}>
-                • Günlük bonus krediler{'\n'}
-                • Boost'ta öncelik{'\n'}  
-                • Özel ödüller
-              </Text>
-            </View>
-            <GradientButton
-              title="Keşfet"
-              onPress={() => Alert.alert('Bilgi', 'VIP sayfası yakında aktif olacak')}
-              size="small"
-              gradient={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
-            />
-          </LinearGradient>
-        </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Son Aktiviteler</Text>
-          <View style={styles.activitiesList}>
-            {activities.map((activity) => (
-              <View key={activity.id} style={styles.activityCard}>
-                <View style={[
-                  styles.activityIcon,
-                  { backgroundColor: activity.type === 'earned' ? colors.success + '20' : colors.error + '20' }
-                ]}>
-                  <MaterialIcons 
-                    name={activity.type === 'earned' ? 'add' : 'remove'} 
-                    size={20} 
-                    color={activity.type === 'earned' ? colors.success : colors.error} 
-                  />
-                </View>
-                
-                <View style={styles.activityInfo}>
-                  <Text style={styles.activityDescription}>
-                    {activity.description}
-                  </Text>
-                  <Text style={styles.activityTime}>
-                    {formatTime(activity.timestamp)}
-                  </Text>
-                </View>
-                
-                <Text style={[
-                  styles.activityAmount,
-                  { color: activity.type === 'earned' ? colors.success : colors.error }
-                ]}>
-                  {activity.amount > 0 ? '+' : ''}{activity.amount}
+          <Text style={styles.sectionTitle}>💰 Kredi Kazan</Text>
+          
+          {/* Daily Ads */}
+          <View style={styles.earnCard}>
+            <View style={styles.earnHeader}>
+              <View style={styles.earnIcon}>
+                <MaterialIcons name="play-circle" size={24} color={colors.error} />
+              </View>
+              <View style={styles.earnContent}>
+                <Text style={styles.earnTitle}>Reklam İzle</Text>
+                <Text style={styles.earnDescription}>
+                  Günde 5 reklam izleyerek toplam 25 kredi kazan
+                </Text>
+                <Text style={styles.earnStatus}>
+                  Kalan hak: {getRemainingAds()}/5
                 </Text>
               </View>
-            ))}
+            </View>
+            
+            <View style={styles.adButtons}>
+              {AD_REWARDS.map((adReward, index) => (
+                <GradientButton
+                  key={index}
+                  title={`${adReward.credits} Kredi`}
+                  onPress={() => watchAd(adReward)}
+                  disabled={getRemainingAds() <= 0}
+                  size="small"
+                  gradient={getRemainingAds() > 0 ? [colors.error, colors.warning] : [colors.textSecondary, colors.border]}
+                  style={styles.adButton}
+                />
+              ))}
+            </View>
           </View>
+
+          {/* Follow Creator */}
+          <View style={styles.earnCard}>
+            <View style={styles.earnHeader}>
+              <View style={[styles.earnIcon, { backgroundColor: colors.accent + '20' }]}>
+                <MaterialIcons name="person-add" size={24} color={colors.accent} />
+              </View>
+              <View style={styles.earnContent}>
+                <Text style={styles.earnTitle}>Yaratıcıyı Takip Et</Text>
+                <Text style={styles.earnDescription}>
+                  @mhmmtcvlk Instagram hesabını takip et ve 10 kredi kazan
+                </Text>
+                <Text style={[
+                  styles.earnStatus,
+                  { color: followCreatorUsed ? colors.success : colors.primary }
+                ]}>
+                  {followCreatorUsed ? 'Tamamlandı ✓' : 'Günlük 1 defa'}
+                </Text>
+              </View>
+            </View>
+            
+            <GradientButton
+              title={followCreatorUsed ? 'Tamamlandı' : 'Takip Et (+10)'}
+              onPress={followCreator}
+              disabled={followCreatorUsed}
+              size="medium"
+              gradient={followCreatorUsed ? [colors.success, '#55EFC4'] : [colors.accent, colors.primary]}
+              style={styles.followButton}
+            />
+          </View>
+
+          {/* VIP Bonus */}
+          {user?.vip_package && user.vip_package !== 'none' && (
+            <View style={styles.vipBonusCard}>
+              <LinearGradient
+                colors={['#FFD700', '#FFA500']}
+                style={styles.vipBonusGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <MaterialIcons name="star" size={24} color="white" />
+                <Text style={styles.vipBonusText}>VIP Bonus: +50% kredi kazancı!</Text>
+              </LinearGradient>
+            </View>
+          )}
         </View>
+
+        {/* Credit Store */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🛒 Kredi Mağazası</Text>
+          <Text style={styles.sectionDescription}>
+            Kredi satın almak için VIP paketlerimizi inceleyin
+          </Text>
+          
+          <GradientButton
+            title="VIP Paketleri Görüntüle"
+            onPress={() => Alert.alert('Bilgi', 'VIP sayfası yakında aktif olacak')}
+            size="large"
+            gradient={['#FFD700', '#FFA500']}
+            style={styles.vipButton}
+          />
+        </View>
+
+        {/* Recent Activities */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📊 Son İşlemler</Text>
+          {activities.length > 0 ? (
+            <View style={styles.activitiesList}>
+              {activities.slice(0, 10).map((activity) => (
+                <View key={activity.id} style={styles.activityItem}>
+                  <View style={[
+                    styles.activityIcon,
+                    { backgroundColor: activity.type === 'earned' ? colors.success + '20' : colors.error + '20' }
+                  ]}>
+                    <MaterialIcons 
+                      name={activity.type === 'earned' ? 'add' : 'remove'} 
+                      size={16} 
+                      color={activity.type === 'earned' ? colors.success : colors.error} 
+                    />
+                  </View>
+                  
+                  <View style={styles.activityInfo}>
+                    <Text style={styles.activityDescription}>{activity.description}</Text>
+                    <Text style={styles.activityTime}>{formatDate(activity.timestamp)}</Text>
+                  </View>
+                  
+                  <Text style={[
+                    styles.activityAmount,
+                    { color: activity.type === 'earned' ? colors.success : colors.error }
+                  ]}>
+                    {activity.type === 'earned' ? '+' : '-'}{activity.amount}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="history" size={48} color={colors.textSecondary} />
+              <Text style={styles.emptyTitle}>Henüz işlem yok</Text>
+              <Text style={styles.emptyDescription}>
+                Kredi kazanmaya başlayın ve geçmişiniz burada görünsün
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Ad Modal */}
+        <Modal
+          visible={showAdModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowAdModal(false)}
+        >
+          <View style={styles.adModalOverlay}>
+            <View style={styles.adModal}>
+              <LinearGradient
+                colors={[colors.error, colors.warning]}
+                style={styles.adContent}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Animated.View style={[
+                  styles.adAnimationContainer,
+                  {
+                    transform: [{
+                      rotate: adAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      })
+                    }]
+                  }
+                ]}>
+                  <MaterialIcons name="play-circle" size={64} color="white" />
+                </Animated.View>
+                
+                <Text style={styles.adTitle}>Reklam Yükleniyor...</Text>
+                <Text style={styles.adSubtitle}>
+                  {selectedAd?.credits} kredi kazanmak için lütfen bekleyin
+                </Text>
+                
+                <View style={styles.adProgress}>
+                  <Animated.View style={[
+                    styles.adProgressFill,
+                    {
+                      width: adAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      })
+                    }
+                  ]} />
+                </View>
+              </LinearGradient>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -318,7 +432,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',  
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
@@ -329,48 +443,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-  creditsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  creditsText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
+  infoButton: {
+    padding: 8,
   },
   scrollView: {
     flex: 1,
   },
   balanceCard: {
     margin: 16,
-    padding: 24,
     borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    padding: 24,
   },
   balanceContent: {
-    flex: 1,
+    alignItems: 'center',
   },
-  balanceLabel: {
-    fontSize: 14,
+  balanceTitle: {
+    fontSize: 16,
     color: 'rgba(255,255,255,0.9)',
+    marginTop: 12,
     marginBottom: 8,
   },
   balanceAmount: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  balanceSubtext: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
+  balanceSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
   },
   section: {
     paddingHorizontal: 16,
@@ -380,32 +482,37 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  earnMethodsList: {
-    gap: 12,
+  sectionDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
   },
   earnCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    marginBottom: 12,
   },
-  disabledCard: {
-    opacity: 0.6,
+  earnHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  earnGradient: {
+  earnIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    backgroundColor: colors.error + '20',
+    marginRight: 12,
   },
-  earnInfo: {
+  earnContent: {
     flex: 1,
   },
   earnTitle: {
@@ -414,61 +521,63 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 4,
   },
-  earnSubtitle: {
+  earnDescription: {
     fontSize: 14,
     color: colors.textSecondary,
-  },
-  disabledText: {
-    color: colors.textSecondary,
-  },
-  earnReward: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    alignContent: 'center',
-    gap: 4,
-  },
-  rewardText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  vipCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    borderRadius: 16,
-    gap: 16,
-  },
-  vipContent: {
-    flex: 1,
-  },
-  vipTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    marginBottom: 8,
-  },
-  vipSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 4,
     lineHeight: 18,
   },
-  activitiesList: {
+  earnStatus: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  adButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  adButton: {
+    flex: 1,
+  },
+  followButton: {
+    marginTop: 8,
+  },
+  vipBonusCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  vipBonusGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
     gap: 12,
   },
-  activityCard: {
+  vipBonusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+    flex: 1,
+  },
+  vipButton: {
+    marginTop: 8,
+  },
+  activitiesList: {
+    gap: 8,
+  },
+  activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
   activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -479,7 +588,7 @@ const styles = StyleSheet.create({
   activityDescription: {
     fontSize: 14,
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   activityTime: {
     fontSize: 12,
@@ -488,5 +597,64 @@ const styles = StyleSheet.create({
   activityAmount: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  adModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adModal: {
+    margin: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    width: '80%',
+  },
+  adContent: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  adAnimationContainer: {
+    marginBottom: 16,
+  },
+  adTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 8,
+  },
+  adSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  adProgress: {
+    width: '100%',
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  adProgressFill: {
+    height: '100%',
+    backgroundColor: 'white',
   },
 });

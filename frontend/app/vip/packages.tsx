@@ -6,29 +6,37 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  Modal,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
-import { useLanguage } from '../../contexts/LanguageContext';
 import { colors } from '../../constants/theme';
 import { GradientButton } from '../../components/GradientButton';
+import { VipCrown } from '../../components/VipCrown';
 import { apiClient } from '../../services/api';
-import { VipPackage } from '../../types/vip';
 
-const PACKAGE_GRADIENTS = {
-  starter: ['#6C5CE7', '#A29BFE'],
-  pro: ['#FDCB6E', '#E17055'],
-  premium: ['#00B894', '#55EFC4'],
-};
+interface VipPackage {
+  id: string;
+  name: string;
+  price: number;
+  duration_days: number;
+  features: string[];
+  is_popular: boolean;
+  is_active: boolean;
+  description: string;
+}
 
 export default function VipPackages() {
-  const { user } = useAuth();
-  const { t, language } = useLanguage();
+  const { user, refreshUser } = useAuth();
   const [packages, setPackages] = useState<VipPackage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPackage, setSelectedPackage] = useState<VipPackage | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   useEffect(() => {
     loadPackages();
@@ -40,94 +48,94 @@ export default function VipPackages() {
       setPackages(data);
     } catch (error) {
       console.error('Error loading VIP packages:', error);
+      Alert.alert('Hata', 'VIP paketleri yüklenemedi');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePurchase = (pkg: VipPackage) => {
-    Alert.alert(
-      'VIP Paket Satın Al',
-      `${pkg.name} paketini ${pkg.price}₺ karşılığında satın almak istediğinizden emin misiniz?`,
-      [
-        { text: 'İptal', style: 'cancel' },
-        { 
-          text: 'Satın Al', 
-          onPress: () => {
-            Alert.alert('Bilgi', 'Ödeme sistemi yakında aktif olacak. Havale/EFT ile ödeme seçeneği gelecek.');
-          }
-        }
-      ]
-    );
+  const handlePurchase = (vipPackage: VipPackage) => {
+    setSelectedPackage(vipPackage);
+    setShowPaymentModal(true);
   };
 
-  const getPackageGradient = (name: string) => {
-    const key = name.toLowerCase();
-    if (key.includes('starter')) return PACKAGE_GRADIENTS.starter;
-    if (key.includes('pro')) return PACKAGE_GRADIENTS.pro;
-    if (key.includes('premium')) return PACKAGE_GRADIENTS.premium;
+  const processPurchase = async (paymentMethod: 'bank_transfer' | 'crypto') => {
+    if (!selectedPackage) return;
+
+    setPurchasing(true);
+    try {
+      const response = await apiClient.purchaseVipPackage(selectedPackage.id, paymentMethod);
+      
+      setShowPaymentModal(false);
+      
+      if (paymentMethod === 'bank_transfer') {
+        Alert.alert(
+          '💳 Ödeme Bilgileri',
+          `Paket: ${selectedPackage.name}\nTutar: ₺${selectedPackage.price}\n\n🏦 Banka Bilgileri:\nZiraat Bankası\nIBAN: TR123456789012345678901234\nAd: CreatorBoostal Ltd.\n\n📱 Telegram'dan ödeme dekontu gönderin:\n@CreatorBoostalBot`,
+          [
+            { text: 'Telegram Aç', onPress: () => openTelegram() },
+            { text: 'Kopyala', onPress: () => copyPaymentInfo() },
+            { text: 'Tamam' }
+          ]
+        );
+      } else {
+        Alert.alert(
+          '₿ Crypto Ödeme',
+          `Paket: ${selectedPackage.name}\nTutar: ₺${selectedPackage.price}\n\n💰 Bitcoin Adresi:\nbc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4\n\n📱 Telegram'dan işlem hash'i gönderin:\n@CreatorBoostalBot`,
+          [
+            { text: 'Telegram Aç', onPress: () => openTelegram() },
+            { text: 'Adresi Kopyala', onPress: () => copyCryptoAddress() },
+            { text: 'Tamam' }
+          ]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Hata', error.response?.data?.detail || 'Satın alma işlemi başlatılamadı');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const openTelegram = async () => {
+    const telegramUrl = 'https://t.me/CreatorBoostalBot';
+    const supported = await Linking.canOpenURL(telegramUrl);
+    
+    if (supported) {
+      await Linking.openURL(telegramUrl);
+    } else {
+      Alert.alert('Hata', 'Telegram uygulaması bulunamadı');
+    }
+  };
+
+  const copyPaymentInfo = () => {
+    // In a real app, you would copy to clipboard
+    Alert.alert('Kopyalandı!', 'Ödeme bilgileri panoya kopyalandı');
+  };
+
+  const copyCryptoAddress = () => {
+    // In a real app, you would copy to clipboard
+    Alert.alert('Kopyalandı!', 'Bitcoin adresi panoya kopyalandı');
+  };
+
+  const isCurrentPackage = (pkg: VipPackage) => {
+    return user?.vip_package === pkg.name.toLowerCase();
+  };
+
+  const getPackageGradient = (pkg: VipPackage) => {
+    if (pkg.name.toLowerCase().includes('starter')) {
+      return ['#3498DB', '#2980B9'];
+    } else if (pkg.name.toLowerCase().includes('pro')) {
+      return ['#F39C12', '#E67E22'];
+    } else if (pkg.name.toLowerCase().includes('premium')) {
+      return ['#FFD700', '#FFA500'];
+    }
     return colors.gradient.primary;
   };
 
-  const getPackageIcon = (name: string) => {
-    const key = name.toLowerCase();
-    if (key.includes('starter')) return 'star-border';
-    if (key.includes('pro')) return 'star-half';
-    if (key.includes('premium')) return 'star';
-    return 'star';
-  };
-
-  const renderPackage = (pkg: VipPackage) => {
-    const isCurrentPackage = user?.vip_package && pkg.name.toLowerCase().includes(user.vip_package);
-    const name = language === 'tr' ? pkg.name : pkg.name_en;
-    const features = language === 'tr' ? pkg.features : pkg.features_en;
-
-    return (
-      <View key={pkg.id} style={styles.packageCard}>
-        <LinearGradient
-          colors={getPackageGradient(pkg.name)}
-          style={styles.packageGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {isCurrentPackage && (
-            <View style={styles.currentBadge}>
-              <Text style={styles.currentBadgeText}>Mevcut</Text>
-            </View>
-          )}
-
-          <View style={styles.packageHeader}>
-            <MaterialIcons 
-              name={getPackageIcon(pkg.name) as any} 
-              size={48} 
-              color="white" 
-            />
-            <Text style={styles.packageName}>{name}</Text>
-            <View style={styles.priceContainer}>
-              <Text style={styles.price}>₺{pkg.price}</Text>
-              <Text style={styles.duration}>/{pkg.duration_days} gün</Text>
-            </View>
-          </View>
-
-          <View style={styles.featuresContainer}>
-            {features.map((feature, index) => (
-              <View key={index} style={styles.featureItem}>
-                <MaterialIcons name="check" size={16} color="white" />
-                <Text style={styles.featureText}>{feature}</Text>
-              </View>
-            ))}
-          </View>
-
-          <GradientButton
-            title={isCurrentPackage ? 'Aktif Paket' : 'Satın Al'}
-            onPress={() => !isCurrentPackage && handlePurchase(pkg)}
-            disabled={isCurrentPackage}
-            gradient={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
-            style={styles.purchaseButton}
-          />
-        </LinearGradient>
-      </View>
-    );
+  const getVipLevel = (pkg: VipPackage): 'starter' | 'pro' | 'premium' => {
+    if (pkg.name.toLowerCase().includes('pro')) return 'pro';
+    if (pkg.name.toLowerCase().includes('premium')) return 'premium';
+    return 'starter';
   };
 
   return (
@@ -144,40 +152,57 @@ export default function VipPackages() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <LinearGradient
-          colors={colors.gradient.primary}
+          colors={['#FFD700', '#FFA500']}
           style={styles.heroSection}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <MaterialIcons name="star" size={64} color="white" />
-          <Text style={styles.heroTitle}>VIP Ol, Farkı Yaşa!</Text>
+          <VipCrown size="large" vipLevel="premium" animated={true} />
+          <Text style={styles.heroTitle}>VIP Ol, Öne Çık!</Text>
           <Text style={styles.heroSubtitle}>
-            Özel özelliklerden yararlan ve sosyal medya hesaplarını daha hızlı büyüt
+            Özel ayrıcalıklarla sosyal medya oyununu bir üst seviyeye taşı
           </Text>
+          
+          {user?.vip_package && user.vip_package !== 'none' && (
+            <View style={styles.currentVipBadge}>
+              <MaterialIcons name="verified" size={16} color="white" />
+              <Text style={styles.currentVipText}>
+                Mevcut Paket: {user.vip_package.toUpperCase()}
+              </Text>
+            </View>
+          )}
         </LinearGradient>
 
-        {/* Current Status */}
-        {user?.vip_package && (
-          <View style={styles.currentStatusCard}>
-            <View style={styles.statusHeader}>
-              <MaterialIcons name="star" size={24} color={colors.warning} />
-              <Text style={styles.statusTitle}>Mevcut VIP Durumunuz</Text>
+        {/* VIP Benefits */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎯 VIP Ayrıcalıkları</Text>
+          <View style={styles.benefitsList}>
+            <View style={styles.benefitItem}>
+              <MaterialIcons name="flash-on" size={24} color={colors.warning} />
+              <Text style={styles.benefitText}>Boost önceliği - Herkesten önce!</Text>
             </View>
-            <Text style={styles.statusPackage}>
-              {user.vip_package.toUpperCase()} Paket
-            </Text>
-            <Text style={styles.statusExpiry}>
-              {user.vip_expires_at 
-                ? `${new Date(user.vip_expires_at).toLocaleDateString('tr-TR')} tarihine kadar geçerli`
-                : 'Süresiz'
-              }
-            </Text>
+            <View style={styles.benefitItem}>
+              <MaterialIcons name="psychology" size={24} color={colors.primary} />
+              <Text style={styles.benefitText}>AI yardımcısı - Akıllı öneriler</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <MaterialIcons name="support-agent" size={24} color={colors.success} />
+              <Text style={styles.benefitText}>7/24 özel destek</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <MaterialIcons name="analytics" size={24} color={colors.accent} />
+              <Text style={styles.benefitText}>Gelişmiş analitikler</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <MaterialIcons name="verified" size={24} color={colors.error} />
+              <Text style={styles.benefitText}>Özel VIP rozet</Text>
+            </View>
           </View>
-        )}
+        </View>
 
         {/* Packages */}
-        <View style={styles.packagesSection}>
-          <Text style={styles.sectionTitle}>Paketleri Karşılaştır</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>💎 Paket Seçenekleri</Text>
           
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -185,111 +210,136 @@ export default function VipPackages() {
             </View>
           ) : (
             <View style={styles.packagesList}>
-              {packages.map(renderPackage)}
+              {packages.filter(pkg => pkg.is_active).map((pkg) => (
+                <View key={pkg.id} style={styles.packageCard}>
+                  {pkg.is_popular && (
+                    <View style={styles.popularBadge}>
+                      <Text style={styles.popularText}>EN POPÜLER</Text>
+                    </View>
+                  )}
+                  
+                  <LinearGradient
+                    colors={getPackageGradient(pkg)}
+                    style={styles.packageHeader}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <VipCrown size="medium" vipLevel={getVipLevel(pkg)} animated={true} />
+                    <Text style={styles.packageName}>{pkg.name}</Text>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.price}>₺{pkg.price}</Text>
+                      <Text style={styles.duration}>/{pkg.duration_days} gün</Text>
+                    </View>
+                  </LinearGradient>
+
+                  <View style={styles.packageBody}>
+                    <Text style={styles.packageDescription}>{pkg.description}</Text>
+                    
+                    <View style={styles.featuresList}>
+                      {pkg.features.map((feature, index) => (
+                        <View key={index} style={styles.featureItem}>
+                          <MaterialIcons name="check-circle" size={16} color={colors.success} />
+                          <Text style={styles.featureText}>{feature}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    {isCurrentPackage(pkg) ? (
+                      <View style={styles.currentPackageButton}>
+                        <MaterialIcons name="verified" size={20} color={colors.success} />
+                        <Text style={styles.currentPackageText}>Aktif Paket</Text>
+                      </View>
+                    ) : (
+                      <GradientButton
+                        title={`${pkg.name} Satın Al`}
+                        onPress={() => handlePurchase(pkg)}
+                        gradient={getPackageGradient(pkg)}
+                        size="medium"
+                        style={styles.purchaseButton}
+                      />
+                    )}
+                  </View>
+                </View>
+              ))}
             </View>
           )}
         </View>
 
-        {/* Benefits Section */}
-        <View style={styles.benefitsSection}>
-          <Text style={styles.sectionTitle}>VIP Avantajları</Text>
-          <View style={styles.benefitsList}>
-            <View style={styles.benefitItem}>
-              <LinearGradient
-                colors={colors.gradient.primary}
-                style={styles.benefitIcon}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <MaterialIcons name="psychology" size={20} color="white" />
-              </LinearGradient>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>AI Destekli İçerik</Text>
-                <Text style={styles.benefitDescription}>
-                  Yapay zeka ile kişiselleştirilmiş içerik önerileri
-                </Text>
+        {/* Payment Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>💳 Ödeme Seçenekleri</Text>
+          <View style={styles.paymentInfo}>
+            <View style={styles.paymentMethod}>
+              <MaterialIcons name="account-balance" size={24} color={colors.primary} />
+              <View style={styles.paymentText}>
+                <Text style={styles.paymentTitle}>Banka Havalesi</Text>
+                <Text style={styles.paymentDescription}>Türk bankalarından güvenli transfer</Text>
               </View>
             </View>
-
-            <View style={styles.benefitItem}>
-              <LinearGradient
-                colors={['#FDCB6E', '#E17055']}
-                style={styles.benefitIcon}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <MaterialIcons name="trending-up" size={20} color="white" />
-              </LinearGradient>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Boost Önceliği</Text>
-                <Text style={styles.benefitDescription}>
-                  Hesapların keşfet sayfasında öne çıkar
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.benefitItem}>
-              <LinearGradient
-                colors={['#00B894', '#55EFC4']}
-                style={styles.benefitIcon}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <MaterialIcons name="analytics" size={20} color="white" />
-              </LinearGradient>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Gelişmiş Analitikler</Text>
-                <Text style={styles.benefitDescription}>
-                  Detaylı performans raporları ve öngörüler
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.benefitItem}>
-              <LinearGradient
-                colors={['#A29BFE', '#6C5CE7']}
-                style={styles.benefitIcon}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <MaterialIcons name="support-agent" size={20} color="white" />
-              </LinearGradient>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Öncelikli Destek</Text>
-                <Text style={styles.benefitDescription}>
-                  7/24 öncelikli müşteri desteği
-                </Text>
+            
+            <View style={styles.paymentMethod}>
+              <MaterialIcons name="currency-bitcoin" size={24} color={colors.warning} />
+              <View style={styles.paymentText}>
+                <Text style={styles.paymentTitle}>Kripto Para</Text>
+                <Text style={styles.paymentDescription}>Bitcoin ile hızlı ödeme</Text>
               </View>
             </View>
           </View>
-        </View>
-
-        {/* FAQ Section */}
-        <View style={styles.faqSection}>
-          <Text style={styles.sectionTitle}>Sık Sorulan Sorular</Text>
-          <View style={styles.faqList}>
-            <View style={styles.faqItem}>
-              <Text style={styles.faqQuestion}>VIP üyelik nasıl iptal edilir?</Text>
-              <Text style={styles.faqAnswer}>
-                VIP üyeliğinizi istediğiniz zaman profil ayarlarından iptal edebilirsiniz.
-              </Text>
-            </View>
-            
-            <View style={styles.faqItem}>
-              <Text style={styles.faqQuestion}>Ödeme yöntemleri nelerdir?</Text>
-              <Text style={styles.faqAnswer}>
-                Kredi kartı, banka kartı ve havale/EFT ile ödeme yapabilirsiniz.
-              </Text>
-            </View>
-            
-            <View style={styles.faqItem}>
-              <Text style={styles.faqQuestion}>VIP özellikler hemen aktif olur mu?</Text>
-              <Text style={styles.faqAnswer}>
-                Ödemeniz onaylandıktan sonra VIP özellikler anında aktif olur.
-              </Text>
-            </View>
+          
+          <View style={styles.securityNote}>
+            <MaterialIcons name="security" size={20} color={colors.success} />
+            <Text style={styles.securityText}>
+              🔒 Tüm ödemeler güvenli ve şifrelidir. Telegram üzerinden onay alırsınız.
+            </Text>
           </View>
         </View>
+
+        {/* Payment Modal */}
+        <Modal
+          visible={showPaymentModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowPaymentModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.paymentModal}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Ödeme Yöntemi Seçin</Text>
+                <Pressable onPress={() => setShowPaymentModal(false)}>
+                  <MaterialIcons name="close" size={24} color={colors.text} />
+                </Pressable>
+              </View>
+
+              {selectedPackage && (
+                <View style={styles.packageSummary}>
+                  <Text style={styles.summaryTitle}>{selectedPackage.name}</Text>
+                  <Text style={styles.summaryPrice}>₺{selectedPackage.price}</Text>
+                  <Text style={styles.summaryDuration}>{selectedPackage.duration_days} gün</Text>
+                </View>
+              )}
+
+              <View style={styles.paymentOptions}>
+                <GradientButton
+                  title="🏦 Banka Havalesi"
+                  onPress={() => processPurchase('bank_transfer')}
+                  disabled={purchasing}
+                  size="large"
+                  gradient={[colors.primary, colors.secondary]}
+                  style={styles.paymentOptionButton}
+                />
+                
+                <GradientButton
+                  title="₿ Bitcoin"
+                  onPress={() => processPurchase('crypto')}
+                  disabled={purchasing}
+                  size="large"
+                  gradient={[colors.warning, colors.error]}
+                  style={styles.paymentOptionButton}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -330,58 +380,61 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: 'white',
     marginTop: 16,
     marginBottom: 8,
-    textAlign: 'center',
   },
   heroSubtitle: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
+    marginBottom: 16,
     lineHeight: 22,
   },
-  currentStatusCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statusHeader: {
+  currentVipBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
   },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginLeft: 8,
-  },
-  statusPackage: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 4,
-  },
-  statusExpiry: {
+  currentVipText: {
     fontSize: 14,
-    color: colors.textSecondary,
+    fontWeight: '600',
+    color: 'white',
   },
-  packagesSection: {
+  section: {
     paddingHorizontal: 16,
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 16,
+  },
+  benefitsList: {
+    gap: 12,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 12,
+  },
+  benefitText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+    flex: 1,
   },
   loadingContainer: {
     padding: 40,
@@ -395,30 +448,31 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   packageCard: {
+    backgroundColor: colors.surface,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: 'hidden',
-  },
-  packageGradient: {
-    padding: 24,
     position: 'relative',
   },
-  currentBadge: {
+  popularBadge: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
+    top: 12,
+    right: 12,
+    backgroundColor: colors.error,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    zIndex: 1,
   },
-  currentBadgeText: {
-    fontSize: 12,
+  popularText: {
+    fontSize: 10,
     fontWeight: 'bold',
     color: 'white',
   },
   packageHeader: {
     alignItems: 'center',
-    marginBottom: 24,
+    padding: 24,
   },
   packageName: {
     fontSize: 24,
@@ -438,87 +492,141 @@ const styles = StyleSheet.create({
   },
   duration: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.9)',
     marginLeft: 4,
   },
-  featuresContainer: {
-    marginBottom: 24,
+  packageBody: {
+    padding: 20,
+  },
+  packageDescription: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  featuresList: {
+    gap: 12,
+    marginBottom: 20,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 8,
   },
   featureText: {
     fontSize: 14,
-    color: 'white',
-    marginLeft: 8,
+    color: colors.text,
     flex: 1,
+  },
+  currentPackageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.success + '20',
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  currentPackageText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.success,
   },
   purchaseButton: {
     marginTop: 8,
   },
-  benefitsSection: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
+  paymentInfo: {
+    gap: 12,
+    marginBottom: 16,
   },
-  benefitsList: {
-    gap: 16,
-  },
-  benefitItem: {
+  paymentMethod: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: 12,
   },
-  benefitIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  benefitContent: {
+  paymentText: {
     flex: 1,
   },
-  benefitTitle: {
+  paymentTitle: {
     fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  paymentDescription: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.success + '10',
+    borderRadius: 12,
+    padding: 16,
+    gap: 8,
+  },
+  securityText: {
+    fontSize: 14,
+    color: colors.text,
+    flex: 1,
+    lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  paymentModal: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  packageSummary: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  summaryTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 4,
   },
-  benefitDescription: {
+  summaryPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  summaryDuration: {
     fontSize: 14,
     color: colors.textSecondary,
-    lineHeight: 18,
   },
-  faqSection: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
+  paymentOptions: {
+    gap: 12,
   },
-  faqList: {
-    gap: 16,
-  },
-  faqItem: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  faqQuestion: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
+  paymentOptionButton: {
     marginBottom: 8,
-  },
-  faqAnswer: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 18,
   },
 });
