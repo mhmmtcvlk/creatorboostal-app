@@ -567,6 +567,190 @@ class CreatorBoostaAPITester:
         # Restore original token
         self.auth_token = old_token
     
+    async def test_vip_packages_for_admin_update(self):
+        """Test 19: Get VIP packages to prepare for admin updates"""
+        success, response = await self.make_request("GET", "/vip/packages")
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if isinstance(data, list) and len(data) > 0:
+                # Store the first package ID for update tests
+                self.vip_package_id = data[0].get("id")
+                self.original_package_price = data[0].get("price")
+                self.log_result("VIP Packages for Admin Update", True, 
+                              f"Retrieved {len(data)} VIP packages for admin testing", 
+                              {"package_count": len(data), "first_package_id": self.vip_package_id})
+            else:
+                self.log_result("VIP Packages for Admin Update", False, 
+                              "No VIP packages available for admin update testing", response)
+        else:
+            self.log_result("VIP Packages for Admin Update", False, 
+                          f"Failed to get VIP packages: {response}", response)
+    
+    async def test_admin_vip_package_price_update(self):
+        """Test 20: Admin VIP package price update"""
+        if not self.admin_token:
+            self.log_result("Admin VIP Package Price Update", False, "No admin token available", None)
+            return
+            
+        if not hasattr(self, 'vip_package_id') or not self.vip_package_id:
+            self.log_result("Admin VIP Package Price Update", False, "No VIP package ID available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        # Test price update using VipPackageUpdate model
+        new_price = 39.99
+        update_data = {
+            "price": new_price
+        }
+        
+        success, response = await self.make_request("PUT", f"/admin/vip/packages/{self.vip_package_id}", update_data)
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "updated" in data["message"].lower():
+                self.log_result("Admin VIP Package Price Update", True, 
+                              f"VIP package price updated successfully: {data['message']}", data)
+            else:
+                self.log_result("Admin VIP Package Price Update", True, 
+                              f"VIP package price update response: {data}", data)
+        else:
+            self.log_result("Admin VIP Package Price Update", False, 
+                          f"Failed to update VIP package price: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_vip_package_status_update(self):
+        """Test 21: Admin VIP package status update"""
+        if not self.admin_token:
+            self.log_result("Admin VIP Package Status Update", False, "No admin token available", None)
+            return
+            
+        if not hasattr(self, 'vip_package_id') or not self.vip_package_id:
+            self.log_result("Admin VIP Package Status Update", False, "No VIP package ID available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        # Test status update using VipPackageUpdate model
+        update_data = {
+            "is_active": False
+        }
+        
+        success, response = await self.make_request("PUT", f"/admin/vip/packages/{self.vip_package_id}", update_data)
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "updated" in data["message"].lower():
+                self.log_result("Admin VIP Package Status Update", True, 
+                              f"VIP package status updated successfully: {data['message']}", data)
+            else:
+                self.log_result("Admin VIP Package Status Update", True, 
+                              f"VIP package status update response: {data}", data)
+        else:
+            self.log_result("Admin VIP Package Status Update", False, 
+                          f"Failed to update VIP package status: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_vip_package_combined_update(self):
+        """Test 22: Admin VIP package combined price and status update"""
+        if not self.admin_token:
+            self.log_result("Admin VIP Package Combined Update", False, "No admin token available", None)
+            return
+            
+        if not hasattr(self, 'vip_package_id') or not self.vip_package_id:
+            self.log_result("Admin VIP Package Combined Update", False, "No VIP package ID available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        # Test combined update using VipPackageUpdate model
+        update_data = {
+            "price": 49.99,
+            "is_active": True
+        }
+        
+        success, response = await self.make_request("PUT", f"/admin/vip/packages/{self.vip_package_id}", update_data)
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "updated" in data["message"].lower():
+                self.log_result("Admin VIP Package Combined Update", True, 
+                              f"VIP package combined update successful: {data['message']}", data)
+            else:
+                self.log_result("Admin VIP Package Combined Update", True, 
+                              f"VIP package combined update response: {data}", data)
+        else:
+            self.log_result("Admin VIP Package Combined Update", False, 
+                          f"Failed to update VIP package (combined): {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_vip_package_invalid_id(self):
+        """Test 23: Admin VIP package update with invalid package ID"""
+        if not self.admin_token:
+            self.log_result("Admin VIP Package Invalid ID", False, "No admin token available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        # Test with invalid package ID
+        invalid_package_id = "invalid-package-id-12345"
+        update_data = {
+            "price": 29.99
+        }
+        
+        success, response = await self.make_request("PUT", f"/admin/vip/packages/{invalid_package_id}", update_data)
+        
+        if not success or response["status"] == 404:
+            self.log_result("Admin VIP Package Invalid ID", True, 
+                          "Correctly handled invalid package ID with 404 error", response)
+        else:
+            self.log_result("Admin VIP Package Invalid ID", False, 
+                          f"Should have returned 404 for invalid package ID: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_vip_package_no_auth(self):
+        """Test 24: Admin VIP package update without authentication"""
+        if not hasattr(self, 'vip_package_id') or not self.vip_package_id:
+            self.log_result("Admin VIP Package No Auth", False, "No VIP package ID available", None)
+            return
+            
+        # Test without admin token
+        old_token = self.auth_token
+        self.auth_token = None
+        
+        update_data = {
+            "price": 29.99
+        }
+        
+        success, response = await self.make_request("PUT", f"/admin/vip/packages/{self.vip_package_id}", update_data)
+        
+        if not success or response["status"] == 401:
+            self.log_result("Admin VIP Package No Auth", True, 
+                          "Correctly requires authentication for VIP package updates", response)
+        else:
+            self.log_result("Admin VIP Package No Auth", False, 
+                          f"Should require authentication for VIP package updates: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
     async def run_all_tests(self):
         """Run all API tests including admin functionality"""
         print(f"🚀 Starting CreatorBoosta API Tests (Including Admin Features)")
