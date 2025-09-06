@@ -190,6 +190,11 @@ class Notification(BaseModel):
     data: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+# VIP Package Update Model
+class VipPackageUpdate(BaseModel):
+    price: Optional[float] = None
+    is_active: Optional[bool] = None
+
 # Admin Models
 class AdminSettings(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
