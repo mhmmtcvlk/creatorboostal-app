@@ -18,6 +18,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { colors } from '../constants/theme';
 import { GradientButton } from '../components/GradientButton';
 import { FakeNotifications } from '../components/FakeNotifications';
+import { RotatingSocialIcons } from '../components/RotatingSocialIcons';
 
 const { width } = Dimensions.get('window');
 
