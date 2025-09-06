@@ -98,25 +98,17 @@ export default function AdminUsers() {
   };
 
   const handleUpdateCredits = (userId: string, currentCredits: number, username: string) => {
-    Alert.prompt(
+    Alert.alert(
       'Kredi Güncelle',
-      `${username} kullanıcısının kredi miktarını girin:`,
+      `${username} kullanıcısının mevcut kredisi: ${currentCredits}\n\nYeni kredi miktarı seçin:`,
       [
         { text: 'İptal', style: 'cancel' },
-        { 
-          text: 'Güncelle', 
-          onPress: (value) => {
-            const credits = parseInt(value || '0');
-            if (!isNaN(credits) && credits >= 0) {
-              updateUserCredits(userId, credits);
-            } else {
-              Alert.alert('Hata', 'Geçerli bir kredi miktarı girin.');
-            }
-          }
-        }
-      ],
-      'plain-text',
-      currentCredits.toString()
+        { text: '0 Kredi', onPress: () => updateUserCredits(userId, 0) },
+        { text: '100 Kredi', onPress: () => updateUserCredits(userId, 100) },
+        { text: '500 Kredi', onPress: () => updateUserCredits(userId, 500) },
+        { text: '1000 Kredi', onPress: () => updateUserCredits(userId, 1000) },
+        { text: '5000 Kredi', onPress: () => updateUserCredits(userId, 5000) },
+      ]
     );
   };
 
