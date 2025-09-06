@@ -372,9 +372,8 @@ class CreatorBoostaAPITester:
         old_token = self.auth_token
         self.auth_token = self.admin_token
         
-        # Try to update user role to VIP
-        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/role", 
-                                                  {"new_role": "vip"})
+        # Try to update user role to VIP - the endpoint expects the role as a query parameter or path parameter
+        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/role?new_role=vip")
         
         if success and response["status"] == 200:
             data = response["data"]
@@ -402,9 +401,8 @@ class CreatorBoostaAPITester:
         old_token = self.auth_token
         self.auth_token = self.admin_token
         
-        # Try to update user credits
-        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/credits", 
-                                                  {"credits": 1000})
+        # Try to update user credits - the endpoint expects credits as a query parameter
+        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/credits?credits=1000")
         
         if success and response["status"] == 200:
             data = response["data"]
@@ -431,12 +429,11 @@ class CreatorBoostaAPITester:
         old_token = self.auth_token
         self.auth_token = self.admin_token
         
-        broadcast_data = {
-            "title": "Test Broadcast Message",
-            "message": "Bu bir test mesajıdır. This is a test message."
-        }
+        # The broadcast endpoint expects title and message as query parameters
+        title = "Test Broadcast Message"
+        message = "Bu bir test mesajıdır. This is a test message."
         
-        success, response = await self.make_request("POST", "/admin/broadcast", broadcast_data)
+        success, response = await self.make_request("POST", f"/admin/broadcast?title={title}&message={message}")
         
         if success and response["status"] == 200:
             data = response["data"]
@@ -464,12 +461,8 @@ class CreatorBoostaAPITester:
         old_token = self.auth_token
         self.auth_token = self.admin_token
         
-        vip_data = {
-            "package": "starter",
-            "duration_days": 30
-        }
-        
-        success, response = await self.make_request("POST", f"/admin/vip/{self.test_user_id}", vip_data)
+        # The VIP endpoint expects package and duration_days as query parameters
+        success, response = await self.make_request("POST", f"/admin/vip/{self.test_user_id}?package=starter&duration_days=30")
         
         if success and response["status"] == 200:
             data = response["data"]
