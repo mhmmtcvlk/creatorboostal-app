@@ -89,6 +89,9 @@ export default function AdminVip() {
     try {
       const newStatus = !currentStatus;
       
+      // Use apiClient for proper backend integration
+      await apiClient.toggleVipPackageStatus(packageId, newStatus);
+      
       // Update local state
       setVipPackages(prev => 
         prev.map(pkg => 
@@ -96,14 +99,14 @@ export default function AdminVip() {
         )
       );
 
-      // In real app, this would call the API
       const pkg = vipPackages.find(p => p.id === packageId);
       Alert.alert(
         'Başarılı!', 
         `${pkg?.name} paketi ${newStatus ? 'aktif' : 'pasif'} edildi.`
       );
     } catch (error) {
-      Alert.alert('Hata', 'Paket durumu güncellenemedi.');
+      console.error('Error toggling package status:', error);
+      Alert.alert('Hata', 'Paket durumu güncellenemedi. Lütfen tekrar deneyin.');
     }
   };
 
