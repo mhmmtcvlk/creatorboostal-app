@@ -29,7 +29,7 @@ class CreatorBoostaAPITester:
         }
         # Admin credentials from review request
         self.admin_data = {
-            "username": "admin",
+            "username": "mhmmtcvlk",  # Actual admin username in database
             "email": "mhmmdc83@gmail.com",
             "password": "admin123"
         }
