@@ -282,7 +282,79 @@ export default function AdminVip() {
           </View>
         </View>
 
-        {/* Search */}
+        {/* VIP Packages Management */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>VIP Paket Fiyatları</Text>
+          {vipPackages.length > 0 ? (
+            <View style={styles.packagesList}>
+              {vipPackages.map((pkg) => (
+                <View key={pkg.id} style={styles.packagePriceCard}>
+                  <View style={styles.packageHeader}>
+                    <View style={styles.packageInfo}>
+                      <Text style={styles.packageTitle}>{pkg.name}</Text>
+                      <Text style={styles.packageDuration}>{pkg.duration_days} gün</Text>
+                    </View>
+                    <View style={styles.packagePrice}>
+                      <Text style={styles.priceSymbol}>₺</Text>
+                      <TextInput
+                        style={styles.priceInput}
+                        value={pkg.price.toString()}
+                        onChangeText={(value) => updatePackagePrice(pkg.id, parseFloat(value) || 0)}
+                        keyboardType="decimal-pad"
+                        placeholder="0.00"
+                      />
+                    </View>
+                  </View>
+                  
+                  <View style={styles.packageFeatures}>
+                    <Text style={styles.featuresTitle}>Özellikler:</Text>
+                    {pkg.features.slice(0, 3).map((feature, index) => (
+                      <Text key={index} style={styles.featureText}>• {feature}</Text>
+                    ))}
+                    {pkg.features.length > 3 && (
+                      <Text style={styles.moreFeatures}>+{pkg.features.length - 3} özellik daha</Text>
+                    )}
+                  </View>
+                  
+                  <View style={styles.packageActions}>
+                    <Pressable
+                      style={[styles.actionButton, styles.saveButton]}
+                      onPress={() => savePackagePrice(pkg.id)}
+                    >
+                      <MaterialIcons name="save" size={16} color={colors.success} />
+                      <Text style={[styles.actionButtonText, { color: colors.success }]}>
+                        Kaydet
+                      </Text>
+                    </Pressable>
+                    
+                    <Pressable
+                      style={[styles.actionButton, styles.toggleButton]}
+                      onPress={() => togglePackageStatus(pkg.id, pkg.is_active)}
+                    >
+                      <MaterialIcons 
+                        name={pkg.is_active ? "visibility" : "visibility-off"} 
+                        size={16} 
+                        color={pkg.is_active ? colors.primary : colors.textSecondary} 
+                      />
+                      <Text style={[
+                        styles.actionButtonText, 
+                        { color: pkg.is_active ? colors.primary : colors.textSecondary }
+                      ]}>
+                        {pkg.is_active ? 'Aktif' : 'Pasif'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MaterialIcons name="attach-money" size={48} color={colors.textSecondary} />
+              <Text style={styles.emptyTitle}>VIP paket bulunamadı</Text>
+              <Text style={styles.emptySubtitle}>VIP paketleri yüklenmedi</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
             <MaterialIcons name="search" size={20} color={colors.textSecondary} />
