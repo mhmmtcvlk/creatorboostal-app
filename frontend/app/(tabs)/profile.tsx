@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { colors } from '../../constants/theme';
 import { GradientButton } from '../../components/GradientButton';
+import { VipCrown } from '../../components/VipCrown';
 import { router } from 'expo-router';
 
 export default function ProfileTab() {
@@ -57,11 +58,15 @@ export default function ProfileTab() {
   const getVipStatusText = () => {
     if (!user?.vip_package) return 'Ücretsiz Üye';
     switch (user.vip_package) {
-      case 'starter': return 'VIP Starter';
-      case 'pro': return 'VIP Pro';
-      case 'premium': return 'VIP Premium';
+      case 'starter': return '👑 VIP Starter';
+      case 'pro': return '👑 VIP Pro';
+      case 'premium': return '👑 VIP Premium';
       default: return 'Ücretsiz Üye';
     }
+  };
+
+  const isVipUser = () => {
+    return user?.vip_package && user.vip_package !== 'none';
   };
 
   const menuItems = [
@@ -71,14 +76,30 @@ export default function ProfileTab() {
       subtitle: 'Özel özelliklerden yararlan',
       icon: 'star',
       color: colors.warning,
-      onPress: () => Alert.alert('Bilgi', 'VIP sayfası yakında aktif olacak'),
+      onPress: () => router.push('/vip/packages'),
+    },
+    {
+      id: 'boost',
+      title: 'Boost Oluştur',
+      subtitle: 'Hesaplarını öne çıkar',
+      icon: 'trending-up',
+      color: colors.primary,
+      onPress: () => router.push('/boost/create'),
+    },
+    {
+      id: 'social',
+      title: 'Sosyal Hesap Ekle',
+      subtitle: 'Yeni hesap bağla',
+      icon: 'add-circle',
+      color: colors.success,
+      onPress: () => router.push('/social/add'),
     },
     {
       id: 'notifications',
       title: 'Bildirimler',
       subtitle: 'Bildirim ayarları',
       icon: 'notifications',
-      color: colors.primary,
+      color: colors.accent,
       onPress: () => Alert.alert('Bilgi', 'Bildirim sayfası yakında aktif olacak'),
     },
     {
@@ -86,7 +107,7 @@ export default function ProfileTab() {
       title: 'Güvenlik',
       subtitle: 'Şifre ve güvenlik ayarları',
       icon: 'security',
-      color: colors.success,
+      color: colors.textSecondary,
       onPress: () => Alert.alert('Bilgi', 'Güvenlik sayfası yakında aktif olacak'),
     },
     {
@@ -94,16 +115,8 @@ export default function ProfileTab() {
       title: 'Yardım & Destek',
       subtitle: 'SSS ve iletişim',
       icon: 'help',
-      color: colors.accent,
+      color: colors.primary,
       onPress: () => Alert.alert('Bilgi', 'Destek sayfası yakında aktif olacak'),
-    },
-    {
-      id: 'about',
-      title: 'Hakkında',
-      subtitle: 'Uygulama bilgileri',
-      icon: 'info',
-      color: colors.textSecondary,
-      onPress: () => Alert.alert('CreatorBoostal v1.0.0', 'Sosyal medya hesaplarınızı büyütün ve keşfedin!'),
     },
   ];
 
@@ -128,7 +141,7 @@ export default function ProfileTab() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Profile Card */}
         <LinearGradient
-          colors={colors.gradient.primary}
+          colors={isVipUser() ? ['#FFD700', '#FFA500'] : colors.gradient.primary}
           style={styles.profileCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -145,16 +158,33 @@ export default function ProfileTab() {
                   {user?.username?.charAt(0).toUpperCase() || 'U'}
                 </Text>
               </LinearGradient>
-              <View style={[styles.statusBadge, { backgroundColor: getVipStatusColor() }]}>
-                <MaterialIcons name="star" size={12} color="white" />
-              </View>
+              
+              {/* VIP Crown Badge */}
+              {isVipUser() && (
+                <View style={styles.crownBadge}>
+                  <VipCrown 
+                    size="small" 
+                    vipLevel={user?.vip_package as any}
+                    animated={true}
+                  />
+                </View>
+              )}
             </View>
             
             <View style={styles.profileInfo}>
-              <Text style={styles.username}>{user?.username}</Text>
+              <View style={styles.usernameRow}>
+                <Text style={styles.username}>{user?.username}</Text>
+                {isVipUser() && (
+                  <VipCrown 
+                    size="medium" 
+                    vipLevel={user?.vip_package as any}
+                    animated={true}
+                  />
+                )}
+              </View>
               <Text style={styles.email}>{user?.email}</Text>
               <View style={styles.statusContainer}>
-                <Text style={[styles.vipStatus, { color: getVipStatusColor() }]}>
+                <Text style={[styles.vipStatus, { color: isVipUser() ? '#FFD700' : 'rgba(255,255,255,0.9)' }]}>
                   {getVipStatusText()}
                 </Text>
               </View>
@@ -163,11 +193,13 @@ export default function ProfileTab() {
 
           <View style={styles.profileStats}>
             <View style={styles.statItem}>
+              <MaterialIcons name="account-balance-wallet" size={20} color="white" />
               <Text style={styles.statNumber}>{user?.credits || 0}</Text>
               <Text style={styles.statLabel}>Kredi</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
+              <MaterialIcons name="calendar-today" size={20} color="white" />
               <Text style={styles.statNumber}>
                 {user?.created_at ? Math.floor((Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0}
               </Text>
@@ -175,10 +207,21 @@ export default function ProfileTab() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
+              <MaterialIcons name={user?.role === 'admin' ? 'admin-panel-settings' : 'person'} size={20} color="white" />
               <Text style={styles.statNumber}>{user?.role === 'admin' ? 'Admin' : 'Üye'}</Text>
               <Text style={styles.statLabel}>Rol</Text>
             </View>
           </View>
+
+          {/* VIP Benefits Preview */}
+          {isVipUser() && (
+            <View style={styles.vipBenefits}>
+              <Text style={styles.vipBenefitsTitle}>🎉 VIP Ayrıcalıkları Aktif</Text>
+              <Text style={styles.vipBenefitsText}>
+                • Boost önceliği • AI yardımcısı • Özel destek • Gelişmiş analitikler
+              </Text>
+            </View>
+          )}
         </LinearGradient>
 
         {/* Quick Actions */}
@@ -199,7 +242,7 @@ export default function ProfileTab() {
               </Pressable>
             )}
             
-            <Pressable style={styles.quickAction} onPress={() => Alert.alert('Bilgi', 'Boost sayfası yakında aktif olacak')}>
+            <Pressable style={styles.quickAction} onPress={() => router.push('/boost/create')}>
               <LinearGradient
                 colors={colors.gradient.primary}
                 style={styles.quickActionGradient}
@@ -211,7 +254,7 @@ export default function ProfileTab() {
               <Text style={styles.quickActionText}>Boost</Text>
             </Pressable>
             
-            <Pressable style={styles.quickAction} onPress={() => Alert.alert('Bilgi', 'VIP sayfası yakında aktif olacak')}>
+            <Pressable style={styles.quickAction} onPress={() => router.push('/vip/packages')}>
               <LinearGradient
                 colors={['#FDCB6E', '#E17055']}
                 style={styles.quickActionGradient}
@@ -223,7 +266,7 @@ export default function ProfileTab() {
               <Text style={styles.quickActionText}>VIP</Text>
             </Pressable>
             
-            <Pressable style={styles.quickAction} onPress={() => Alert.alert('Bilgi', 'Krediler sayfası aktif')}>
+            <Pressable style={styles.quickAction} onPress={() => router.push('/(tabs)/credits')}>
               <LinearGradient
                 colors={['#00B894', '#55EFC4']}
                 style={styles.quickActionGradient}
@@ -396,26 +439,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  statusBadge: {
+  crownBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
+    top: -4,
+    right: -4,
   },
   profileInfo: {
     flex: 1,
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
   },
   username: {
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
   },
   email: {
     fontSize: 14,
@@ -437,23 +478,41 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 16,
   },
   statItem: {
     alignItems: 'center',
+    gap: 4,
   },
   statNumber: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: 'rgba(255,255,255,0.9)',
   },
   statDivider: {
     width: 1,
     backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  vipBenefits: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  vipBenefitsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+    marginBottom: 4,
+  },
+  vipBenefitsText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 16,
   },
   section: {
     paddingHorizontal: 16,
