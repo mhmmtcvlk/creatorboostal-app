@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 
 # Import our modules
-from models import *
-from auth import create_access_token, verify_token
-from database import database
+from .models import *
+from .auth import create_access_token, verify_token
+from .database import database
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
