@@ -117,6 +117,27 @@ class ApiClient {
     return response.data;
   }
 
+  // Admin User Management endpoints
+  async getAdminUsers(): Promise<User[]> {
+    const response = await this.client.get<User[]>('/admin/users');
+    return response.data;
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<{ message: string }> {
+    const response = await this.client.put(`/admin/users/${userId}/role`, role);
+    return response.data;
+  }
+
+  async updateUserCredits(userId: string, credits: number): Promise<{ message: string }> {
+    const response = await this.client.put(`/admin/users/${userId}/credits`, credits);
+    return response.data;
+  }
+
+  async getAdminStats(): Promise<any> {
+    const response = await this.client.get('/admin/stats');
+    return response.data;
+  }
+
   // Forum endpoints
   async getForumCategories(): Promise<ForumCategory[]> {
     const response = await this.client.get<ForumCategory[]>('/forum/categories');
