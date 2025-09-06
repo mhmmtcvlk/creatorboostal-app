@@ -2,8 +2,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import os
-from .models import *
-from .auth import get_password_hash, verify_password
+from models import *
+from auth import get_password_hash, verify_password
 import logging
 
 logger = logging.getLogger(__name__)
