@@ -147,7 +147,7 @@ export const translations = {
       userExists: 'This username or email is already in use',
     },
     home: {
-      welcome: 'Welcome to CreatorBoosta',
+      welcome: 'Welcome to CreatorBoostal',
       subtitle: 'Grow and discover social media accounts',
       boostYourAccount: 'Boost Your Account',
       discoverAccounts: 'Discover Accounts',
