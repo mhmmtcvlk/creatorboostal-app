@@ -85,37 +85,27 @@ export default function AdminPanel() {
   };
 
   const handleBroadcastMessage = () => {
-    Alert.prompt(
+    Alert.alert(
       'Mesaj Gönder',
-      'Tüm kullanıcılara göndermek istediğiniz mesajı yazın:',
+      'Tüm kullanıcılara hangi mesajı göndermek istiyorsunuz?',
       [
         { text: 'İptal', style: 'cancel' },
-        { 
-          text: 'Gönder', 
-          onPress: async (message) => {
-            if (message) {
-              try {
-                await fetch('/api/admin/broadcast', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${await getAuthToken()}`,
-                  },
-                  body: JSON.stringify({
-                    title: 'Sistem Duyurusu',
-                    message: message,
-                  }),
-                });
-                Alert.alert('Başarılı', 'Mesaj tüm kullanıcılara gönderildi');
-              } catch (error) {
-                Alert.alert('Hata', 'Mesaj gönderilemedi');
-              }
-            }
-          }
-        }
-      ],
-      'plain-text'
+        { text: 'Sistem Bakımı', onPress: () => sendBroadcast('Sistem Bakımı', 'Sistem bakım çalışması nedeniyle kısa süre kesinti yaşanabilir.') },
+        { text: 'Yeni Özellik', onPress: () => sendBroadcast('Yeni Özellik!', 'CreatorBoostal\'da yeni özellikler eklendi! Keşfetmek için uygulamayı güncelleyin.') },
+        { text: 'Hoş Geldiniz', onPress: () => sendBroadcast('Hoş Geldiniz!', 'CreatorBoostal ailesine hoş geldiniz! Sosyal medya hesaplarınızı büyütmek için hazırız.') },
+        { text: 'VIP İndirim', onPress: () => sendBroadcast('VIP İndirim!', '🎉 Sınırlı süre VIP paketlerinde %20 indirim! Fırsatı kaçırmayın.') },
+      ]
     );
+  };
+
+  const sendBroadcast = async (title: string, message: string) => {
+    try {
+      await apiClient.sendBroadcast(title, message);
+      Alert.alert('Başarılı', 'Mesaj tüm kullanıcılara gönderildi');
+    } catch (error) {
+      console.error('Error sending broadcast:', error);
+      Alert.alert('Hata', 'Mesaj gönderilemedi');
+    }
   };
 
   const adminActions = [
