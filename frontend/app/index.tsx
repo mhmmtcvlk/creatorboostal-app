@@ -356,6 +356,9 @@ const styles = StyleSheet.create({
   heroContent: {
     alignItems: 'center',
   },
+  rotatingIconsContainer: {
+    marginBottom: 20,
+  },
   heroTitle: {
     fontSize: 28,
     fontWeight: 'bold',
