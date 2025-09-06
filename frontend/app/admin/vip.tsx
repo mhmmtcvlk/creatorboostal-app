@@ -75,28 +75,13 @@ export default function AdminVip() {
       const pkg = vipPackages.find(p => p.id === packageId);
       if (!pkg) return;
 
-      // Call the real API
-      const response = await fetch(`/api/admin/vip/packages/${packageId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`,
-        },
-        body: JSON.stringify({
-          price: pkg.price,
-        }),
-      });
-
-      if (response.ok) {
-        Alert.alert('Başarılı!', `${pkg.name} paketi fiyatı ₺${pkg.price} olarak güncellendi.`);
-      } else {
-        // Mock success for demo purposes
-        Alert.alert('Başarılı!', `${pkg.name} paketi fiyatı ₺${pkg.price} olarak güncellendi.`);
-      }
+      // Use apiClient for proper backend integration
+      await apiClient.updateVipPackagePrice(packageId, pkg.price);
+      
+      Alert.alert('Başarılı!', `${pkg.name} paketi fiyatı ₺${pkg.price} olarak güncellendi.`);
     } catch (error) {
-      // Mock success for demo purposes
-      const pkg = vipPackages.find(p => p.id === packageId);
-      Alert.alert('Başarılı!', `${pkg?.name} paketi fiyatı ₺${pkg?.price} olarak güncellendi.`);
+      console.error('Error updating package price:', error);
+      Alert.alert('Hata', 'Paket fiyatı güncellenemedi. Lütfen tekrar deneyin.');
     }
   };
 
