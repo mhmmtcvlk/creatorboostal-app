@@ -321,26 +321,182 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-  placeholder: {
-    width: 40,
+  refreshButton: {
+    padding: 8,
   },
-  content: {
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
   },
-  title: {
-    fontSize: 24,
+  statsSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statNumber: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: colors.text,
+    marginVertical: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  searchSection: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+    marginLeft: 12,
+  },
+  section: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  usersList: {
+    gap: 12,
+  },
+  userCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  userHeader: {
+    marginBottom: 12,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  username: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  userEmail: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  userStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  creditsText: {
+    fontSize: 12,
+    color: colors.success,
+    fontWeight: '500',
+  },
+  joinedText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  userActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  roleButton: {
+    borderColor: colors.primary,
+  },
+  creditsButton: {
+    borderColor: colors.success,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.text,
     marginTop: 16,
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 16,
+  emptySubtitle: {
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
   },
 });
