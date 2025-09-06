@@ -359,6 +359,9 @@ const styles = StyleSheet.create({
   rotatingIconsContainer: {
     marginBottom: 20,
   },
+  rotatingIconsContainer: {
+    marginBottom: 20,
+  },
   heroTitle: {
     fontSize: 28,
     fontWeight: 'bold',
