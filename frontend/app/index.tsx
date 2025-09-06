@@ -99,7 +99,7 @@ export default function Index() {
           >
             <MaterialIcons name="trending-up" size={24} color="white" />
           </LinearGradient>
-          <Text style={styles.logoText}>CreatorBoosta</Text>
+          <Text style={styles.logoText}>CreatorBoostal</Text>
         </View>
         
         <View style={styles.headerActions}>
