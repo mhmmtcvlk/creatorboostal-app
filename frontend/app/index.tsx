@@ -263,7 +263,7 @@ export default function Index() {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            © 2025 CreatorBoosta. Tüm hakları saklıdır.
+            © 2025 CreatorBoostal. Tüm hakları saklıdır.
           </Text>
           <View style={styles.socialLinks}>
             <Pressable style={styles.socialButton}>
