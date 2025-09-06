@@ -257,47 +257,52 @@ export default function CreateBoost() {
           )}
         </View>
 
-        {/* Duration Selection */}
-        {selectedAccount && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Boost Süresi Seçin</Text>
-            <View style={styles.durationsList}>
-              {BOOST_DURATIONS.map((duration) => (
-                <Pressable
-                  key={duration.hours}
-                  style={[
-                    styles.durationCard,
-                    selectedDuration.hours === duration.hours && styles.selectedDurationCard
-                  ]}
-                  onPress={() => setSelectedDuration(duration)}
-                >
-                  <Text style={[
-                    styles.durationLabel,
-                    selectedDuration.hours === duration.hours && styles.selectedText
-                  ]}>
-                    {duration.label}
-                  </Text>
-                  <Text style={[
-                    styles.durationCredits,
-                    selectedDuration.hours === duration.hours && styles.selectedText
-                  ]}>
-                    {duration.credits} Kredi
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+        {/* Duration Selection - ALWAYS SHOW FOR DEBUG */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Boost Süresi Seçin</Text>
+          <Text style={styles.debugText}>
+            Selected Account: {selectedAccount ? selectedAccount.display_name : 'NONE'}
+          </Text>
+          <View style={styles.durationsList}>
+            {BOOST_DURATIONS.map((duration) => (
+              <Pressable
+                key={duration.hours}
+                style={[
+                  styles.durationCard,
+                  selectedDuration.hours === duration.hours && styles.selectedDurationCard
+                ]}
+                onPress={() => {
+                  console.log('🕐 Duration selected:', duration.label);
+                  setSelectedDuration(duration);
+                }}
+              >
+                <Text style={[
+                  styles.durationLabel,
+                  selectedDuration.hours === duration.hours && styles.selectedText
+                ]}>
+                  {duration.label}
+                </Text>
+                <Text style={[
+                  styles.durationCredits,
+                  selectedDuration.hours === duration.hours && styles.selectedText
+                ]}>
+                  {duration.credits} Kredi
+                </Text>
+              </Pressable>
+            ))}
           </View>
-        )}
+        </View>
 
-        {/* Boost Summary */}
-        {selectedAccount && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Boost Özeti</Text>
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Hesap:</Text>
-                <Text style={styles.summaryValue}>{selectedAccount.display_name}</Text>
-              </View>
+        {/* Boost Summary - ALWAYS SHOW FOR DEBUG */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Boost Özeti</Text>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Hesap:</Text>
+              <Text style={styles.summaryValue}>
+                {selectedAccount ? selectedAccount.display_name : 'Seçilmedi'}
+              </Text>
+            </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Süre:</Text>
                 <Text style={styles.summaryValue}>{selectedDuration.label}</Text>
