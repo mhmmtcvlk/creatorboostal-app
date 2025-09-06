@@ -19,7 +19,6 @@ import { router } from 'expo-router';
 
 export default function ProfileTab() {
   const { user, logout } = useAuth();
-  const router = useRouter();
   const { t, language, setLanguage } = useLanguage();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
