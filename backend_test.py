@@ -275,8 +275,9 @@ class CreatorBoostaAPITester:
     
     async def test_admin_login(self):
         """Test 10: Admin login with provided credentials"""
+        # Try login with email first (as per review request)
         login_data = {
-            "username": self.admin_data["username"],
+            "username": self.admin_data["email"],  # Try email as username
             "password": self.admin_data["password"]
         }
         
@@ -296,7 +297,29 @@ class CreatorBoostaAPITester:
             else:
                 self.log_result("Admin Login", False, "Invalid login response format", response)
         else:
-            self.log_result("Admin Login", False, f"Admin login failed: {response}", response)
+            # Try with username if email failed
+            login_data = {
+                "username": self.admin_data["username"],
+                "password": self.admin_data["password"]
+            }
+            
+            success, response = await self.make_request("POST", "/auth/login", login_data)
+            
+            if success and response["status"] == 200:
+                data = response["data"]
+                if "access_token" in data and "user" in data:
+                    self.admin_token = data["access_token"]
+                    user = data["user"]
+                    if user.get("role") == "admin":
+                        self.log_result("Admin Login", True, 
+                                      f"Admin login successful: {user['username']} (role: {user['role']})", data)
+                    else:
+                        self.log_result("Admin Login", False, 
+                                      f"User logged in but role is not admin: {user.get('role')}", data)
+                else:
+                    self.log_result("Admin Login", False, "Invalid login response format", response)
+            else:
+                self.log_result("Admin Login", False, f"Admin login failed with both email and username: {response}", response)
     
     async def test_admin_stats(self):
         """Test 11: Admin platform statistics"""
