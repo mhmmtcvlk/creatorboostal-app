@@ -552,12 +552,12 @@ class CreatorBoostaAPITester:
         self.auth_token = old_token
     
     async def run_all_tests(self):
-        """Run all API tests"""
-        print(f"🚀 Starting CreatorBoosta API Tests")
+        """Run all API tests including admin functionality"""
+        print(f"🚀 Starting CreatorBoosta API Tests (Including Admin Features)")
         print(f"📡 Backend URL: {API_BASE}")
         print("=" * 60)
         
-        # Test sequence
+        # Basic API test sequence
         await self.test_health_check()
         await self.test_user_registration()
         await self.test_user_login()
@@ -568,6 +568,21 @@ class CreatorBoostaAPITester:
         await self.test_ad_watched_reward()
         await self.test_authentication_protection()
         
+        # Admin functionality tests
+        print("\n" + "=" * 60)
+        print("🔐 ADMIN FUNCTIONALITY TESTS")
+        print("=" * 60)
+        
+        await self.test_admin_login()
+        await self.test_admin_stats()
+        await self.test_admin_get_users()
+        await self.test_admin_update_user_role()
+        await self.test_admin_update_user_credits()
+        await self.test_admin_broadcast_message()
+        await self.test_admin_grant_vip()
+        await self.test_admin_get_settings()
+        await self.test_admin_update_settings()
+        
         # Summary
         print("\n" + "=" * 60)
         print("📊 TEST SUMMARY")
@@ -576,16 +591,26 @@ class CreatorBoostaAPITester:
         passed = sum(1 for r in self.results if r["success"])
         total = len(self.results)
         
+        # Separate basic and admin test results
+        basic_tests = [r for r in self.results if not r["test"].startswith("Admin")]
+        admin_tests = [r for r in self.results if r["test"].startswith("Admin")]
+        
+        basic_passed = sum(1 for r in basic_tests if r["success"])
+        admin_passed = sum(1 for r in admin_tests if r["success"])
+        
         print(f"Total Tests: {total}")
-        print(f"Passed: {passed}")
-        print(f"Failed: {total - passed}")
-        print(f"Success Rate: {(passed/total)*100:.1f}%")
+        print(f"Basic API Tests: {len(basic_tests)} (Passed: {basic_passed})")
+        print(f"Admin Tests: {len(admin_tests)} (Passed: {admin_passed})")
+        print(f"Overall Success Rate: {(passed/total)*100:.1f}%")
         
         if total - passed > 0:
             print("\n❌ FAILED TESTS:")
             for result in self.results:
                 if not result["success"]:
                     print(f"  - {result['test']}: {result['message']}")
+        
+        if admin_passed == len(admin_tests) and len(admin_tests) > 0:
+            print("\n✅ ALL ADMIN FEATURES WORKING CORRECTLY!")
         
         return passed == total
 
