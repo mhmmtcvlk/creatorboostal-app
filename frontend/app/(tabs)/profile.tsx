@@ -186,6 +186,20 @@ export default function ProfileTab() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Hızlı İşlemler</Text>
           <View style={styles.quickActions}>
+            {user?.role === 'admin' && (
+              <Pressable style={styles.quickAction} onPress={() => router.push('/admin')}>
+                <LinearGradient
+                  colors={['#E17055', '#D63031']}
+                  style={styles.quickActionGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <MaterialIcons name="admin-panel-settings" size={20} color="white" />
+                </LinearGradient>
+                <Text style={styles.quickActionText}>Admin</Text>
+              </Pressable>
+            )}
+            
             <Pressable style={styles.quickAction} onPress={() => Alert.alert('Bilgi', 'Boost sayfası yakında aktif olacak')}>
               <LinearGradient
                 colors={colors.gradient.primary}
