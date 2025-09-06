@@ -15,7 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { colors } from '../../constants/theme';
 import { GradientButton } from '../../components/GradientButton';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 
 export default function ProfileTab() {
   const { user, logout } = useAuth();
