@@ -309,17 +309,17 @@ backend:
           agent: "testing"
           comment: "Admin settings endpoint (GET /api/admin/settings) working correctly. Returns 9 admin settings including telegram_bot_token, creator_instagram, company_name, etc."
 
-  - task: "Admin Settings Update API"
+  - task: "VIP Package Update API"
     implemented: true
-    working: true
+    working: false
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-        - working: true
-          agent: "testing"
-          comment: "Admin settings update endpoint (PUT /api/admin/settings) working correctly. Successfully updates admin settings with proper authentication."
+        - working: false
+          agent: "main"
+          comment: "Updated VIP package update endpoint to use VipPackageUpdate model. Fixed hardcoded API URLs in frontend and updated to use apiClient. Need to test if Save and Purchase buttons work properly."
 
 frontend:
   - task: "Frontend Testing"
