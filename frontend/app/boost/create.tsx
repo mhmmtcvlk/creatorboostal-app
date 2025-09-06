@@ -679,4 +679,10 @@ const styles = StyleSheet.create({
   addButton: {
     flex: 1,
   },
+  debugText: {
+    fontSize: 12,
+    color: colors.error,
+    marginBottom: 8,
+    fontWeight: 'bold',
+  },
 });
