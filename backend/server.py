@@ -326,11 +326,11 @@ async def login(login_data: UserLogin):
         id=user.id,
         username=user.username,
         email=user.email,
-        role=user.role,
-        vip_package=user.vip_package,
+        role=user.role.value,  # Convert enum to string
+        vip_package=user.vip_package.value if user.vip_package else None,  # Convert enum to string
         vip_expires_at=user.vip_expires_at,
         credits=user.credits,
-        language=user.language,
+        language=user.language.value,  # Convert enum to string
         is_following_creator=user.is_following_creator,
         created_at=user.created_at
     )
