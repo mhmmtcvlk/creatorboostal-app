@@ -408,28 +408,28 @@ async def get_vip_packages():
 @api_router.put("/admin/vip/packages/{package_id}")
 async def update_vip_package(
     package_id: str,
-    price: Optional[float] = None,
-    is_active: Optional[bool] = None,
+    update_data: VipPackageUpdate,
     admin_user: User = Depends(get_admin_user)
 ):
     """Update VIP package price or status (admin only)"""
-    update_data = {}
-    if price is not None:
-        update_data["price"] = price
-    if is_active is not None:
-        update_data["is_active"] = is_active
+    update_fields = {}
     
-    if not update_data:
+    if update_data.price is not None:
+        update_fields["price"] = update_data.price
+    if update_data.is_active is not None:
+        update_fields["is_active"] = update_data.is_active
+    
+    if not update_fields:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No update data provided"
         )
     
-    update_data["updated_at"] = datetime.utcnow()
+    update_fields["updated_at"] = datetime.utcnow()
     
     result = await database.db.vip_packages.update_one(
         {"id": package_id},
-        {"$set": update_data}
+        {"$set": update_fields}
     )
     
     if result.modified_count == 0:
