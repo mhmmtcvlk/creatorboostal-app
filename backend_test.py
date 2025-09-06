@@ -785,6 +785,18 @@ class CreatorBoostaAPITester:
         await self.test_admin_get_settings()
         await self.test_admin_update_settings()
         
+        # VIP Package Update Tests (Critical for Save/Purchase buttons)
+        print("\n" + "=" * 60)
+        print("📦 VIP PACKAGE UPDATE TESTS")
+        print("=" * 60)
+        
+        await self.test_vip_packages_for_admin_update()
+        await self.test_admin_vip_package_price_update()
+        await self.test_admin_vip_package_status_update()
+        await self.test_admin_vip_package_combined_update()
+        await self.test_admin_vip_package_invalid_id()
+        await self.test_admin_vip_package_no_auth()
+        
         # Summary
         print("\n" + "=" * 60)
         print("📊 TEST SUMMARY")
