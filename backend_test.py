@@ -27,6 +27,14 @@ class CreatorBoostaAPITester:
             "security_answer": "mavi",
             "language": "tr"
         }
+        # Admin credentials from review request
+        self.admin_data = {
+            "username": "admin",
+            "email": "mhmmdc83@gmail.com",
+            "password": "admin123"
+        }
+        self.admin_token: Optional[str] = None
+        self.test_user_id: Optional[str] = None
         self.results = []
         
     async def __aenter__(self):
