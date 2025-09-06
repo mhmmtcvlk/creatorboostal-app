@@ -32,7 +32,7 @@ export const translations = {
       userExists: 'Bu kullanıcı adı veya e-posta zaten kullanımda',
     },
     home: {
-      welcome: 'CreatorBoosta\'ya Hoş Geldiniz',
+      welcome: 'CreatorBoostal\'ya Hoş Geldiniz',
       subtitle: 'Sosyal medya hesaplarınızı büyütün ve keşfedin',
       boostYourAccount: 'Hesabınızı Boost Edin',
       discoverAccounts: 'Hesapları Keşfedin',
