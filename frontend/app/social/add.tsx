@@ -228,8 +228,8 @@ export default function AddSocialAccount() {
               <View style={styles.previewStats}>
                 <Text style={styles.previewFollowers}>{formData.followers_count}</Text>
                 <Text style={styles.previewLabel}>Takipçi</Text>
-              </div>
-            </div>
+              </View>
+            </View>
             {formData.description && (
               <Text style={styles.previewDescription}>{formData.description}</Text>
             )}
