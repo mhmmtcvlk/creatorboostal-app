@@ -35,6 +35,8 @@ class CreatorBoostaAPITester:
         }
         self.admin_token: Optional[str] = None
         self.test_user_id: Optional[str] = None
+        self.vip_package_id: Optional[str] = None
+        self.original_package_price: Optional[float] = None
         self.results = []
         
     async def __aenter__(self):
