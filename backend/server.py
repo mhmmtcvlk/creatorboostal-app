@@ -10,7 +10,7 @@ from typing import Optional, List
 
 # Import our modules
 from models import *
-from auth import create_access_token, verify_token
+from auth import create_access_token, verify_token, get_password_hash
 from database import database
 
 ROOT_DIR = Path(__file__).parent
