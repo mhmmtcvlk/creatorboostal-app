@@ -527,6 +527,189 @@ async def follow_creator(current_user: User = Depends(get_current_user)):
     
     return {"message": "Creator followed, 10 credits awarded"}
 
+# Admin Routes
+@api_router.get("/admin/users", response_model=List[UserResponse])
+async def get_all_users(admin_user: User = Depends(get_admin_user)):
+    """Get all users (admin only)"""
+    cursor = database.db.users.find()
+    users = []
+    async for user_doc in cursor:
+        user = User(**user_doc)
+        users.append(UserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            role=user.role,
+            vip_package=user.vip_package,
+            vip_expires_at=user.vip_expires_at,
+            credits=user.credits,
+            language=user.language,
+            is_following_creator=user.is_following_creator,
+            created_at=user.created_at
+        ))
+    return users
+
+@api_router.put("/admin/users/{user_id}/role")
+async def update_user_role(
+    user_id: str,
+    new_role: UserRole,
+    admin_user: User = Depends(get_admin_user)
+):
+    """Update user role (admin only)"""
+    result = await database.db.users.update_one(
+        {"id": user_id},
+        {"$set": {"role": new_role}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return {"message": f"User role updated to {new_role}"}
+
+@api_router.put("/admin/users/{user_id}/credits")
+async def update_user_credits_admin(
+    user_id: str,
+    credits: int,
+    admin_user: User = Depends(get_admin_user)
+):
+    """Update user credits (admin only)"""
+    result = await database.db.users.update_one(
+        {"id": user_id},
+        {"$set": {"credits": credits}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return {"message": f"User credits updated to {credits}"}
+
+@api_router.delete("/admin/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    admin_user: User = Depends(get_admin_user)
+):
+    """Delete user (admin only)"""
+    result = await database.db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return {"message": "User deleted successfully"}
+
+@api_router.get("/admin/settings")
+async def get_admin_settings(admin_user: User = Depends(get_admin_user)):
+    """Get admin settings"""
+    cursor = database.db.admin_settings.find()
+    settings = {}
+    async for doc in cursor:
+        settings[doc["key"]] = doc["value"]
+    return settings
+
+@api_router.put("/admin/settings")
+async def update_admin_settings(
+    settings: dict,
+    admin_user: User = Depends(get_admin_user)
+):
+    """Update admin settings"""
+    for key, value in settings.items():
+        await database.db.admin_settings.update_one(
+            {"key": key},
+            {"$set": {"value": value, "updated_at": datetime.utcnow()}},
+            upsert=True
+        )
+    return {"message": "Settings updated successfully"}
+
+@api_router.get("/admin/stats")
+async def get_admin_stats(admin_user: User = Depends(get_admin_user)):
+    """Get platform statistics"""
+    total_users = await database.db.users.count_documents({})
+    vip_users = await database.db.users.count_documents({"role": {"$in": ["vip", "admin"]}})
+    total_boosts = await database.db.boosts.count_documents({})
+    active_boosts = await database.db.boosts.count_documents({"is_active": True})
+    total_topics = await database.db.forum_topics.count_documents({})
+    total_social_accounts = await database.db.social_accounts.count_documents({})
+    
+    # Revenue calculation (mock for now)
+    total_vip_purchases = await database.db.vip_purchases.count_documents({"payment_status": "approved"})
+    
+    return {
+        "total_users": total_users,
+        "vip_users": vip_users,
+        "total_boosts": total_boosts,
+        "active_boosts": active_boosts,
+        "total_topics": total_topics,
+        "total_social_accounts": total_social_accounts,
+        "total_vip_purchases": total_vip_purchases,
+        "revenue": total_vip_purchases * 50.0  # Mock revenue calculation
+    }
+
+@api_router.post("/admin/broadcast")
+async def broadcast_message(
+    title: str,
+    message: str,
+    admin_user: User = Depends(get_admin_user)
+):
+    """Broadcast message to all users"""
+    cursor = database.db.users.find()
+    users_notified = 0
+    
+    async for user_doc in cursor:
+        notification = Notification(
+            user_id=user_doc["id"],
+            type=NotificationType.NEW_MESSAGE,
+            title=title,
+            title_en=title,  # For simplicity using same title
+            message=message,
+            message_en=message
+        )
+        await database.create_notification(notification)
+        users_notified += 1
+    
+    return {"message": f"Message broadcasted to {users_notified} users"}
+
+@api_router.post("/admin/vip/{user_id}")
+async def grant_vip(
+    user_id: str,
+    package: VipPackage,
+    duration_days: int = 30,
+    admin_user: User = Depends(get_admin_user)
+):
+    """Grant VIP to user (admin only)"""
+    expires_at = datetime.utcnow() + timedelta(days=duration_days)
+    
+    result = await database.db.users.update_one(
+        {"id": user_id},
+        {
+            "$set": {
+                "role": UserRole.VIP,
+                "vip_package": package,
+                "vip_expires_at": expires_at
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Create notification
+    notification = Notification(
+        user_id=user_id,
+        type=NotificationType.VIP_APPROVED,
+        title="VIP Üyeliğiniz Onaylandı!",
+        title_en="Your VIP Membership Approved!",
+        message=f"{package.upper()} paketiniz {duration_days} gün boyunca aktif.",
+        message_en=f"Your {package.upper()} package is active for {duration_days} days."
+    )
+    await database.create_notification(notification)
+    
+    return {"message": f"VIP {package} granted to user for {duration_days} days"}
+
 # Include router
 app.include_router(api_router)
 
