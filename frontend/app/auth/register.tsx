@@ -142,7 +142,7 @@ export default function Register() {
             >
               <MaterialIcons name="trending-up" size={48} color="white" />
             </LinearGradient>
-            <Text style={styles.logoText}>CreatorBoosta</Text>
+            <Text style={styles.logoText}>CreatorBoostal</Text>
             <Text style={styles.logoSubtext}>Hesap oluşturun</Text>
           </View>
 
