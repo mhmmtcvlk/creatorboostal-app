@@ -98,12 +98,19 @@ export default function CreateBoost() {
   };
 
   const handleCreateBoost = async () => {
+    console.log('🚀 handleCreateBoost called');
+    console.log('Selected account:', selectedAccount);
+    console.log('Selected duration:', selectedDuration);
+    console.log('User credits:', user?.credits);
+    
     if (!selectedAccount) {
+      console.log('❌ No account selected');
       Alert.alert('Hata', 'Lütfen boost etmek istediğiniz hesabı seçin');
       return;
     }
 
     if ((user?.credits || 0) < selectedDuration.credits) {
+      console.log('❌ Insufficient credits');
       Alert.alert(
         'Yetersiz Kredi',
         `Bu boost için ${selectedDuration.credits} kredi gerekli. Mevcut krediniz: ${user?.credits || 0}`,
@@ -115,6 +122,7 @@ export default function CreateBoost() {
       return;
     }
 
+    console.log('✅ Showing confirmation alert');
     Alert.alert(
       'Boost Oluştur',
       `${selectedAccount.display_name} hesabını ${selectedDuration.label} boyunca ${selectedDuration.credits} kredi karşılığında boost etmek istediğinizden emin misiniz?`,
