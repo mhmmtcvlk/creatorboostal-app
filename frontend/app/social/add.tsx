@@ -206,7 +206,7 @@ export default function AddSocialAccount() {
                 keyboardType="numeric"
               />
             </View>
-          </div>
+          </View>
         </View>
 
         {/* Preview Card */}
