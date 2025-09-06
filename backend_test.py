@@ -397,8 +397,8 @@ class CreatorBoostaAPITester:
         old_token = self.auth_token
         self.auth_token = self.admin_token
         
-        # Try to update user role to VIP - the endpoint expects the role as a query parameter or path parameter
-        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/role?new_role=vip")
+        # Try to update user role to VIP - the endpoint expects the role as request body
+        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/role", "vip")
         
         if success and response["status"] == 200:
             data = response["data"]
