@@ -136,6 +136,11 @@ export default function Index() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.heroContent}>
+            {/* Rotating Social Icons */}
+            <View style={styles.rotatingIconsContainer}>
+              <RotatingSocialIcons />
+            </View>
+            
             <Text style={styles.heroTitle}>{t('home.welcome')}</Text>
             <Text style={styles.heroSubtitle}>{t('home.subtitle')}</Text>
             
