@@ -100,6 +100,23 @@ class ApiClient {
     return response.data;
   }
 
+  // Admin VIP endpoints
+  async updateVipPackagePrice(packageId: string, price: number): Promise<void> {
+    await this.client.put(`/admin/vip/packages/${packageId}`, { price });
+  }
+
+  async toggleVipPackageStatus(packageId: string, isActive: boolean): Promise<void> {
+    await this.client.put(`/admin/vip/packages/${packageId}`, { is_active: isActive });
+  }
+
+  async purchaseVipPackage(packageId: string, paymentMethod: string = 'bank_transfer'): Promise<any> {
+    const response = await this.client.post('/vip/purchase', {
+      package_id: packageId,
+      payment_method: paymentMethod
+    });
+    return response.data;
+  }
+
   // Forum endpoints
   async getForumCategories(): Promise<ForumCategory[]> {
     const response = await this.client.get<ForumCategory[]>('/forum/categories');
