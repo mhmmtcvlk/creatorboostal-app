@@ -80,8 +80,34 @@ async def shutdown_db_client():
     await database.close_mongo_connection()
 
 async def initialize_default_data():
-    """Initialize default forum categories and VIP packages"""
+    """Initialize default forum categories, VIP packages, and admin user"""
     try:
+        # Check if admin user exists
+        admin_email = "mhmmdc83@gmail.com"
+        admin_user = await database.db.users.find_one({"email": admin_email})
+        
+        if not admin_user:
+            # Create admin user
+            admin_user_data = User(
+                username="admin",
+                email=admin_email,
+                password_hash=get_password_hash("admin123"),  # Default admin password
+                security_question="İlk evcil hayvanınızın adı neydi?",
+                security_answer_hash=get_password_hash("admin"),
+                role=UserRole.ADMIN,
+                credits=99999,  # Unlimited credits for admin
+                language=Language.TR
+            )
+            await database.db.users.insert_one(admin_user_data.dict())
+            logger.info(f"Admin user created: {admin_email}")
+        else:
+            # Update existing user to admin
+            await database.db.users.update_one(
+                {"email": admin_email},
+                {"$set": {"role": UserRole.ADMIN, "credits": 99999}}
+            )
+            logger.info(f"User updated to admin: {admin_email}")
+
         # Check if forum categories exist
         categories = await database.get_forum_categories()
         if not categories:
@@ -131,16 +157,18 @@ async def initialize_default_data():
                     features=[
                         "AI destekli içerik önerileri",
                         "Boost'ta %20 öncelik",
-                        "Günlük 10 bonus kredi",
+                        "Günlük 20 bonus kredi",
                         "Özel VIP rozeti",
-                        "Mesajlaşma özelliği"
+                        "Mesajlaşma özelliği",
+                        "Öncelikli müşteri desteği"
                     ],
                     features_en=[
                         "AI-powered content suggestions",
                         "20% boost priority",
-                        "10 daily bonus credits",
+                        "20 daily bonus credits",
                         "Exclusive VIP badge",
-                        "Messaging feature"
+                        "Messaging feature",
+                        "Priority customer support"
                     ]
                 ),
                 VipPackageInfo(
@@ -151,18 +179,22 @@ async def initialize_default_data():
                     features=[
                         "Gelişmiş AI analitikleri",
                         "Boost'ta %50 öncelik",
-                        "Günlük 25 bonus kredi",
+                        "Günlük 50 bonus kredi",
                         "Altın VIP rozeti",
                         "Öncelikli destek",
-                        "Özel kategori erişimi"
+                        "Özel kategori erişimi",
+                        "Detaylı hesap analitikleri",
+                        "Otomatik boost özelliği"
                     ],
                     features_en=[
                         "Advanced AI analytics",
                         "50% boost priority", 
-                        "25 daily bonus credits",
+                        "50 daily bonus credits",
                         "Gold VIP badge",
                         "Priority support",
-                        "Exclusive category access"
+                        "Exclusive category access",
+                        "Detailed account analytics",
+                        "Auto-boost feature"
                     ]
                 ),
                 VipPackageInfo(
@@ -173,26 +205,53 @@ async def initialize_default_data():
                     features=[
                         "Tam AI destekli otomatik içerik",
                         "Boost'ta %100 öncelik",
-                        "Günlük 50 bonus kredi",
+                        "Günlük 100 bonus kredi",
                         "Elmas VIP rozeti",
                         "Kişisel hesap yöneticisi",
                         "Özel etkinlik erişimi",
-                        "Gelişmiş hesap analitikleri"
+                        "Gelişmiş hesap analitikleri",
+                        "Sınırsız otomatik boost",
+                        "Özel telegram desteği"
                     ],
                     features_en=[
                         "Full AI-powered auto content",
                         "100% boost priority",
-                        "50 daily bonus credits", 
+                        "100 daily bonus credits", 
                         "Diamond VIP badge",
                         "Personal account manager",
                         "Exclusive event access",
-                        "Advanced account analytics"
+                        "Advanced account analytics",
+                        "Unlimited auto-boost",
+                        "Private telegram support"
                     ]
                 )
             ]
             
             for package in default_packages:
                 await database.db.vip_packages.insert_one(package.dict())
+        
+        # Initialize admin settings
+        admin_settings = [
+            {"key": "telegram_bot_token", "value": "", "description": "Telegram Bot API Token"},
+            {"key": "telegram_chat_id", "value": "", "description": "Telegram Chat ID for notifications"},
+            {"key": "instagram_api_token", "value": "", "description": "Instagram Basic Display API Token"},
+            {"key": "admob_app_id", "value": "", "description": "AdMob App ID"},
+            {"key": "admob_ad_unit_id", "value": "", "description": "AdMob Ad Unit ID"},
+            {"key": "creator_instagram", "value": "mhmmtcvlk", "description": "Creator Instagram username"},
+            {"key": "company_name", "value": "CreatorBoostal", "description": "Company name"},
+            {"key": "company_email", "value": "info@creatorboostal.com", "description": "Company email"},
+            {"key": "support_email", "value": "support@creatorboostal.com", "description": "Support email"},
+        ]
+        
+        for setting in admin_settings:
+            existing = await database.db.admin_settings.find_one({"key": setting["key"]})
+            if not existing:
+                admin_setting = AdminSettings(
+                    key=setting["key"],
+                    value=setting["value"],
+                    description=setting["description"]
+                )
+                await database.db.admin_settings.insert_one(admin_setting.dict())
         
         logger.info("Default data initialized")
     except Exception as e:
