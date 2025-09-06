@@ -273,6 +273,284 @@ class CreatorBoostaAPITester:
         # Restore token
         self.auth_token = old_token
     
+    async def test_admin_login(self):
+        """Test 10: Admin login with provided credentials"""
+        login_data = {
+            "username": self.admin_data["username"],
+            "password": self.admin_data["password"]
+        }
+        
+        success, response = await self.make_request("POST", "/auth/login", login_data)
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "access_token" in data and "user" in data:
+                self.admin_token = data["access_token"]
+                user = data["user"]
+                if user.get("role") == "admin":
+                    self.log_result("Admin Login", True, 
+                                  f"Admin login successful: {user['username']} (role: {user['role']})", data)
+                else:
+                    self.log_result("Admin Login", False, 
+                                  f"User logged in but role is not admin: {user.get('role')}", data)
+            else:
+                self.log_result("Admin Login", False, "Invalid login response format", response)
+        else:
+            self.log_result("Admin Login", False, f"Admin login failed: {response}", response)
+    
+    async def test_admin_stats(self):
+        """Test 11: Admin platform statistics"""
+        if not self.admin_token:
+            self.log_result("Admin Stats", False, "No admin token available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        success, response = await self.make_request("GET", "/admin/stats")
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            expected_fields = ["total_users", "vip_users", "total_boosts", "active_boosts", 
+                             "total_topics", "total_social_accounts", "total_vip_purchases", "revenue"]
+            
+            if all(field in data for field in expected_fields):
+                self.log_result("Admin Stats", True, 
+                              f"Platform stats retrieved successfully: {len(data)} metrics", data)
+            else:
+                missing = [f for f in expected_fields if f not in data]
+                self.log_result("Admin Stats", False, f"Missing stats fields: {missing}", response)
+        else:
+            self.log_result("Admin Stats", False, f"Failed to get admin stats: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_get_users(self):
+        """Test 12: Admin get all users"""
+        if not self.admin_token:
+            self.log_result("Admin Get Users", False, "No admin token available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        success, response = await self.make_request("GET", "/admin/users")
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if isinstance(data, list):
+                if len(data) > 0:
+                    # Store a test user ID for later tests
+                    for user in data:
+                        if user.get("role") != "admin":
+                            self.test_user_id = user.get("id")
+                            break
+                    
+                    self.log_result("Admin Get Users", True, 
+                                  f"Retrieved {len(data)} users successfully", {"user_count": len(data)})
+                else:
+                    self.log_result("Admin Get Users", True, "No users found (empty list)", data)
+            else:
+                self.log_result("Admin Get Users", False, "Response is not a list", response)
+        else:
+            self.log_result("Admin Get Users", False, f"Failed to get users: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_update_user_role(self):
+        """Test 13: Admin update user role"""
+        if not self.admin_token or not self.test_user_id:
+            self.log_result("Admin Update User Role", False, 
+                          "No admin token or test user ID available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        # Try to update user role to VIP
+        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/role", 
+                                                  {"new_role": "vip"})
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "role updated" in data["message"].lower():
+                self.log_result("Admin Update User Role", True, 
+                              f"User role updated successfully: {data['message']}", data)
+            else:
+                self.log_result("Admin Update User Role", True, 
+                              f"Role update response: {data}", data)
+        else:
+            self.log_result("Admin Update User Role", False, 
+                          f"Failed to update user role: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_update_user_credits(self):
+        """Test 14: Admin update user credits"""
+        if not self.admin_token or not self.test_user_id:
+            self.log_result("Admin Update User Credits", False, 
+                          "No admin token or test user ID available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        # Try to update user credits
+        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/credits", 
+                                                  {"credits": 1000})
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "credits updated" in data["message"].lower():
+                self.log_result("Admin Update User Credits", True, 
+                              f"User credits updated successfully: {data['message']}", data)
+            else:
+                self.log_result("Admin Update User Credits", True, 
+                              f"Credits update response: {data}", data)
+        else:
+            self.log_result("Admin Update User Credits", False, 
+                          f"Failed to update user credits: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_broadcast_message(self):
+        """Test 15: Admin broadcast message to all users"""
+        if not self.admin_token:
+            self.log_result("Admin Broadcast Message", False, "No admin token available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        broadcast_data = {
+            "title": "Test Broadcast Message",
+            "message": "Bu bir test mesajıdır. This is a test message."
+        }
+        
+        success, response = await self.make_request("POST", "/admin/broadcast", broadcast_data)
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "broadcasted" in data["message"].lower():
+                self.log_result("Admin Broadcast Message", True, 
+                              f"Broadcast successful: {data['message']}", data)
+            else:
+                self.log_result("Admin Broadcast Message", True, 
+                              f"Broadcast response: {data}", data)
+        else:
+            self.log_result("Admin Broadcast Message", False, 
+                          f"Failed to broadcast message: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_grant_vip(self):
+        """Test 16: Admin grant VIP to user"""
+        if not self.admin_token or not self.test_user_id:
+            self.log_result("Admin Grant VIP", False, 
+                          "No admin token or test user ID available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        vip_data = {
+            "package": "starter",
+            "duration_days": 30
+        }
+        
+        success, response = await self.make_request("POST", f"/admin/vip/{self.test_user_id}", vip_data)
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "vip" in data["message"].lower():
+                self.log_result("Admin Grant VIP", True, 
+                              f"VIP granted successfully: {data['message']}", data)
+            else:
+                self.log_result("Admin Grant VIP", True, 
+                              f"VIP grant response: {data}", data)
+        else:
+            self.log_result("Admin Grant VIP", False, 
+                          f"Failed to grant VIP: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_get_settings(self):
+        """Test 17: Admin get settings"""
+        if not self.admin_token:
+            self.log_result("Admin Get Settings", False, "No admin token available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        success, response = await self.make_request("GET", "/admin/settings")
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if isinstance(data, dict):
+                expected_settings = ["telegram_bot_token", "creator_instagram", "company_name"]
+                found_settings = [s for s in expected_settings if s in data]
+                
+                if len(found_settings) > 0:
+                    self.log_result("Admin Get Settings", True, 
+                                  f"Admin settings retrieved: {len(data)} settings", 
+                                  {"settings_count": len(data), "sample_keys": list(data.keys())[:5]})
+                else:
+                    self.log_result("Admin Get Settings", False, 
+                                  f"No expected settings found in response", response)
+            else:
+                self.log_result("Admin Get Settings", False, "Response is not a dictionary", response)
+        else:
+            self.log_result("Admin Get Settings", False, f"Failed to get admin settings: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
+    async def test_admin_update_settings(self):
+        """Test 18: Admin update settings"""
+        if not self.admin_token:
+            self.log_result("Admin Update Settings", False, "No admin token available", None)
+            return
+            
+        # Use admin token for this request
+        old_token = self.auth_token
+        self.auth_token = self.admin_token
+        
+        settings_update = {
+            "company_name": "CreatorBoostal Test",
+            "support_email": "test@creatorboostal.com"
+        }
+        
+        success, response = await self.make_request("PUT", "/admin/settings", settings_update)
+        
+        if success and response["status"] == 200:
+            data = response["data"]
+            if "message" in data and "updated" in data["message"].lower():
+                self.log_result("Admin Update Settings", True, 
+                              f"Settings updated successfully: {data['message']}", data)
+            else:
+                self.log_result("Admin Update Settings", True, 
+                              f"Settings update response: {data}", data)
+        else:
+            self.log_result("Admin Update Settings", False, 
+                          f"Failed to update settings: {response}", response)
+        
+        # Restore original token
+        self.auth_token = old_token
+    
     async def run_all_tests(self):
         """Run all API tests"""
         print(f"🚀 Starting CreatorBoosta API Tests")
