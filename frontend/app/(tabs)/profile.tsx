@@ -102,7 +102,7 @@ export default function ProfileTab() {
       subtitle: 'Uygulama bilgileri',
       icon: 'info',
       color: colors.textSecondary,
-      onPress: () => Alert.alert('CreatorBoosta v1.0.0', 'Sosyal medya hesaplarınızı büyütün ve keşfedin!'),
+      onPress: () => Alert.alert('CreatorBoostal v1.0.0', 'Sosyal medya hesaplarınızı büyütün ve keşfedin!'),
     },
   ];
 
@@ -317,7 +317,7 @@ export default function ProfileTab() {
 
         {/* Footer Info */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>CreatorBoosta v1.0.0</Text>
+          <Text style={styles.footerText}>CreatorBoostal v1.0.0</Text>
           <Text style={styles.footerText}>© 2025 Tüm hakları saklıdır</Text>
           {user?.created_at && (
             <Text style={styles.footerText}>
