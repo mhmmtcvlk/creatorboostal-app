@@ -138,6 +138,13 @@ class ApiClient {
     return response.data;
   }
 
+  async sendBroadcast(title: string, message: string): Promise<void> {
+    await this.client.post('/admin/broadcast', {
+      title,
+      message
+    });
+  }
+
   // Forum endpoints
   async getForumCategories(): Promise<ForumCategory[]> {
     const response = await this.client.get<ForumCategory[]>('/forum/categories');
