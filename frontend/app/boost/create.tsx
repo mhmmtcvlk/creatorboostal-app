@@ -219,7 +219,10 @@ export default function CreateBoost() {
                     styles.accountCard,
                     selectedAccount?.id === account.id && styles.selectedAccountCard
                   ]}
-                  onPress={() => setSelectedAccount(account)}
+                  onPress={() => {
+                    console.log('🎯 Account selected:', account.display_name, account.id);
+                    setSelectedAccount(account);
+                  }}
                 >
                   <View style={styles.accountHeader}>
                     <Ionicons 
