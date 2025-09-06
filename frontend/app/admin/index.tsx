@@ -65,8 +65,13 @@ export default function AdminPanel() {
   };
 
   const getAuthToken = async () => {
-    // This would normally get the token from AsyncStorage
-    return 'your-auth-token-here';
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      return await AsyncStorage.getItem('auth_token');
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
   };
 
   const onRefresh = async () => {
