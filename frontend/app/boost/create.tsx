@@ -59,7 +59,14 @@ export default function CreateBoost() {
     try {
       const data = await apiClient.discoverAccounts(0, 50);
       // Filter user's own accounts (in a real app, we'd have a separate endpoint)
-      setAccounts(data.slice(0, 5)); // Mock user accounts
+      const userAccounts = data.slice(0, 5); // Mock user accounts
+      setAccounts(userAccounts);
+      
+      // Auto-select first account if available
+      if (userAccounts.length > 0 && !selectedAccount) {
+        setSelectedAccount(userAccounts[0]);
+        console.log('✅ Auto-selected first account:', userAccounts[0]);
+      }
     } catch (error) {
       console.error('Error loading accounts:', error);
     }
