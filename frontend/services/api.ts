@@ -145,6 +145,15 @@ class ApiClient {
     });
   }
 
+  async getAdminSettings(): Promise<any[]> {
+    const response = await this.client.get('/admin/settings');
+    return response.data;
+  }
+
+  async updateAdminSettings(settings: any): Promise<void> {
+    await this.client.put('/admin/settings', settings);
+  }
+
   // Forum endpoints
   async getForumCategories(): Promise<ForumCategory[]> {
     const response = await this.client.get<ForumCategory[]>('/forum/categories');
