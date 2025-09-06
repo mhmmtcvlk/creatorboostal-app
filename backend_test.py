@@ -426,8 +426,8 @@ class CreatorBoostaAPITester:
         old_token = self.auth_token
         self.auth_token = self.admin_token
         
-        # Try to update user credits - the endpoint expects credits as a query parameter
-        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/credits?credits=1000")
+        # Try to update user credits - the endpoint expects credits as request body
+        success, response = await self.make_request("PUT", f"/admin/users/{self.test_user_id}/credits", 1000)
         
         if success and response["status"] == 200:
             data = response["data"]
