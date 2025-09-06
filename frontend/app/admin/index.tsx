@@ -118,19 +118,35 @@ export default function AdminPanel() {
       onPress: () => router.push('/admin/vip'),
     },
     {
+      id: 'payment',
+      title: 'Ödeme Yönetimi',
+      subtitle: 'Ödeme onayları',
+      icon: 'payment',
+      color: colors.success,
+      onPress: () => router.push('/admin/analytics'),
+    },
+    {
+      id: 'payment-settings',
+      title: 'Ödeme Ayarları',
+      subtitle: 'Banka & Mobil ödeme',
+      icon: 'settings',
+      color: colors.accent,
+      onPress: () => router.push('/admin/payment-settings'),
+    },
+    {
       id: 'forum',
       title: 'Forum Yönetimi',
       subtitle: 'Kategoriler ve konular',
       icon: 'forum',
-      color: colors.success,
+      color: colors.primary,
       onPress: () => router.push('/admin/forum'),
     },
     {
       id: 'settings',
       title: 'Sistem Ayarları',
       subtitle: 'API anahtarları ve yapılandırma',
-      icon: 'settings',
-      color: colors.accent,
+      icon: 'admin-panel-settings',
+      color: colors.error,
       onPress: () => router.push('/admin/settings'),
     },
     {
@@ -140,14 +156,6 @@ export default function AdminPanel() {
       icon: 'campaign',
       color: colors.error,
       onPress: handleBroadcastMessage,
-    },
-    {
-      id: 'analytics',
-      title: 'Analitikler',
-      subtitle: 'Detaylı platform istatistikleri',
-      icon: 'analytics',
-      color: colors.primary,
-      onPress: () => router.push('/admin/analytics'),
     },
   ];
 
