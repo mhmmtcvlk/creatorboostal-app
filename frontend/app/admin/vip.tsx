@@ -782,4 +782,83 @@ const styles = StyleSheet.create({
   quickActionButton: {
     marginBottom: 8,
   },
+  packagesList: {
+    gap: 16,
+  },
+  packagePriceCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  packageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  packageInfo: {
+    flex: 1,
+  },
+  packageTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  packageDuration: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  packagePrice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  priceSymbol: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginRight: 4,
+  },
+  priceInput: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    minWidth: 60,
+    textAlign: 'right',
+  },
+  packageFeatures: {
+    marginBottom: 16,
+  },
+  featuresTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  featureText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  moreFeatures: {
+    fontSize: 12,
+    color: colors.primary,
+    fontStyle: 'italic',
+  },
+  packageActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  saveButton: {
+    borderColor: colors.success,
+  },
+  toggleButton: {
+    borderColor: colors.border,
+  },
 });
