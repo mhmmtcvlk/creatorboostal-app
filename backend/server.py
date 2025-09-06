@@ -201,7 +201,7 @@ async def initialize_default_data():
 # Routes
 @api_router.get("/")
 async def root():
-    return {"message": "CreatorBoosta API v1.0.0", "status": "active"}
+    return {"message": "CreatorBoostal API v1.0.0", "status": "active"}
 
 # Health check
 @api_router.get("/health")
